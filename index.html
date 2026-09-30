@@ -1,0 +1,1217 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>Codebreaker</title>
+<meta name="theme-color" content="#0a0e14">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Codebreaker">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
+<style>
+:root{
+  --bg:#0a0e14; --panel:#111823; --panel2:#172130; --line:#233142; --text:#e8eef5; --muted:#8a9bb1;
+  --hit:#2ee59d; --near:#ffb547; --accent:#5cc8ff; --danger:#ff5c7a;
+  --p0:#5cc8ff; --p1:#ff7ac6;
+  --mono:ui-monospace,"Roboto Mono","Droid Sans Mono",Menlo,monospace;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overscroll-behavior:none;
+  -webkit-user-select:none;user-select:none;overflow:hidden}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer;touch-action:manipulation}
+input{font:inherit}
+body{touch-action:manipulation}
+#app{height:100%;display:flex;flex-direction:column;
+  padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+.screen{flex:1;min-height:0;display:flex;flex-direction:column;width:100%;max-width:1100px;margin:0 auto;padding:14px 16px}
+.scroll{overflow-y:auto;-webkit-overflow-scrolling:touch}
+.center{align-items:center;justify-content:center;text-align:center}
+h1,h2,h3{margin:0}
+.muted{color:var(--muted)}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.p0{color:var(--p0)} .p1{color:var(--p1)}
+
+/* buttons */
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;min-height:54px;padding:0 20px;border-radius:14px;
+  background:var(--panel2);border:1px solid var(--line);font-weight:650;font-size:17px;width:100%}
+.btn:active{transform:scale(.98)}
+.btn.primary{background:var(--accent);color:#04121d;border-color:transparent}
+.btn.hit{background:var(--hit);color:#03170e;border-color:transparent}
+.btn.danger{color:var(--danger)}
+.btn[disabled]{opacity:.35;pointer-events:none}
+.stack{display:flex;flex-direction:column;gap:12px;width:100%;max-width:420px}
+.iconbtn{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;background:var(--panel);border:1px solid var(--line);font-size:20px}
+
+/* logo */
+.logo{font-weight:800;letter-spacing:.18em;font-size:clamp(30px,8vw,48px)}
+.logo span{color:var(--hit)}
+.logopegs{display:grid;grid-template-columns:repeat(2,26px);gap:10px;margin:0 auto 22px}
+.tag{margin:10px 0 30px;font-size:16px}
+
+/* pegs */
+.pegs{display:grid;grid-template-columns:repeat(2,var(--pg,15px));gap:5px;flex:none}
+.peg{width:var(--pg,15px);height:var(--pg,15px);border-radius:50%;background:#1d2835}
+.peg.hit{background:var(--hit);box-shadow:0 0 10px rgba(46,229,157,.55)}
+.peg.near{background:transparent;border:3.5px solid var(--near);box-shadow:0 0 8px rgba(255,181,71,.35)}
+.new .peg{animation:pop .4s both}
+@keyframes pop{0%{transform:scale(0)}70%{transform:scale(1.3)}100%{transform:scale(1)}}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:13px;color:var(--muted);align-items:center}
+.legend i{display:inline-block;width:13px;height:13px;border-radius:50%;vertical-align:-2px;margin-right:6px}
+.legend i.hit{background:var(--hit)} .legend i.near{border:3px solid var(--near)}
+
+/* tiles / input */
+.slots{display:flex;gap:10px;justify-content:center}
+.tile{width:clamp(52px,15vw,70px);height:clamp(60px,17vw,80px);border-radius:14px;background:var(--panel2);border:2px solid var(--line);
+  display:grid;place-items:center;font:700 clamp(28px,8vw,40px)/1 var(--mono)}
+.tile.cur{border-color:var(--accent);box-shadow:0 0 0 4px rgba(92,200,255,.18)}
+.tile.cur:empty::after{content:"";width:3px;height:45%;background:var(--accent);animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+.tile.dot{font-size:20px}
+.msg{min-height:22px;text-align:center;font-size:14px;margin:8px 0 4px;color:var(--danger)}
+.msg.info{color:var(--near)} .msg.ok{color:var(--muted)}
+.shake{animation:shake .35s}
+@keyframes shake{25%{transform:translateX(-8px)}50%{transform:translateX(8px)}75%{transform:translateX(-4px)}}
+
+/* keypad */
+.keys{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.key{height:clamp(44px,6.2vh,64px);border-radius:14px;background:var(--panel2);border:1px solid var(--line);
+  font:600 26px var(--mono);position:relative}
+.key:active{transform:scale(.95);background:#22324a}
+.key.out{opacity:.3;text-decoration:line-through}
+.key.in{border-color:var(--hit);color:var(--hit)}
+.key.go{background:var(--accent);color:#04121d;border-color:transparent;font:700 18px system-ui,sans-serif}
+.key.back{font-size:22px}
+.key[disabled]{opacity:.25;pointer-events:none}
+
+/* notes */
+.toolhead{display:flex;align-items:center;justify-content:space-between;margin:10px 0 6px;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+.toolhead button{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);padding:4px 0}
+.notes{display:grid;grid-template-columns:repeat(10,1fr);gap:4px;margin-bottom:10px}
+.chip{height:34px;border-radius:9px;background:var(--panel);border:1px solid var(--line);font:600 17px var(--mono)}
+.chip.s1{opacity:.4;text-decoration:line-through;color:var(--danger);border-color:transparent}
+.chip.s2{background:rgba(46,229,157,.14);border-color:var(--hit);color:var(--hit)}
+.grid{display:grid;grid-template-columns:44px repeat(10,1fr);gap:4px;align-items:center}
+.grid .lab{font-size:12px;color:var(--muted);text-align:center}
+.cell{height:34px;border-radius:8px;background:var(--panel);border:1px solid var(--line);font:600 15px var(--mono);color:var(--muted)}
+.cell.s1{background:rgba(255,92,122,.1);border-color:rgba(255,92,122,.35);color:var(--danger)}
+.cell.s2{background:rgba(46,229,157,.14);border-color:var(--hit);color:var(--hit)}
+
+/* play layout */
+.topbar{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.topbar .t{flex:1;min-width:0}
+.topbar .t h2{font-size:20px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.topbar .t div{font-size:13px;color:var(--muted);margin-top:2px}
+.peek{height:44px;padding:0 12px;border-radius:12px;background:var(--panel);border:1px solid var(--line);font-size:13px;color:var(--muted);min-width:92px}
+.peek.on{color:var(--text);font:700 18px var(--mono);letter-spacing:.15em}
+.opp{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px 12px;margin-bottom:10px}
+.opp b{color:var(--text);font-weight:600}
+.opp .pegs{--pg:10px;gap:3px;margin-left:auto}
+.play{flex:1;min-height:0;display:flex;flex-direction:column}
+.play .left{flex:1;min-height:0;display:flex;flex-direction:column}
+.histwrap{flex:1;min-height:90px;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:10px}
+.history{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:6px;padding-right:2px;margin-top:8px}
+.row{display:flex;align-items:center;gap:12px;padding:6px 10px;border-radius:12px;background:var(--panel2)}
+.row .n{width:22px;color:var(--muted);font-size:13px;text-align:right;flex:none}
+.row .d{display:flex;gap:6px}
+.row .d span{width:34px;height:38px;border-radius:9px;background:#0e141d;display:grid;place-items:center;font:700 22px var(--mono)}
+.row .zero{font-size:11px;color:var(--muted);margin-left:auto;text-transform:uppercase;letter-spacing:.06em}
+.row .zero + .pegs{margin-left:0}
+.row .pegs{margin-left:auto}
+.row.win{background:rgba(46,229,157,.12);outline:1px solid var(--hit)}
+.row.new{animation:slidein .3s both}
+@keyframes slidein{from{opacity:0;transform:translateY(8px)}}
+.empty{margin:auto;text-align:center;color:var(--muted);font-size:14px;padding:20px;line-height:1.5}
+.assist{font-size:13px;color:var(--near);text-align:center;margin-top:8px}
+.controls{flex:none;padding-top:12px}
+.seg{display:flex;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:3px;margin:0 0 8px}
+.seg button{flex:1;height:36px;border-radius:9px;font-size:14px;color:var(--muted);font-weight:600}
+.seg button.on{background:var(--panel2);color:var(--text)}
+.result{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px;text-align:center}
+.result .big{display:flex;justify-content:center;gap:26px;margin:4px 0 14px;font-size:15px}
+.result .big div{display:flex;flex-direction:column;align-items:center;gap:6px}
+.result .big strong{font:800 30px var(--mono)}
+.wideonly{display:none}
+
+@media (min-width:720px){
+  .play{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:18px;min-height:0}
+  .play .controls{padding-top:0;overflow-y:auto;min-height:0}
+  .row .d span{width:44px;height:50px;font-size:26px}
+  .row{--pg:18px;padding:9px 14px}
+  .narrowonly{display:none}
+  .wideonly{display:block}
+}
+@media (max-height:700px) and (max-width:719px){
+  .key{height:46px}
+  .tile{height:54px;width:48px}
+}
+
+/* cover / handoff */
+.cover{background:radial-gradient(circle at 50% 30%,#152235 0%,var(--bg) 70%)}
+.avatar{width:92px;height:92px;border-radius:50%;display:grid;place-items:center;font-size:40px;font-weight:800;margin:0 auto 18px;color:#07101a}
+.cover h1{font-size:clamp(26px,7vw,38px);line-height:1.15}
+.cover p{font-size:16px;color:var(--muted);max-width:360px;margin:12px auto 30px;line-height:1.5}
+
+/* forms */
+.field{display:flex;flex-direction:column;gap:6px;text-align:left}
+.field label{font-size:13px;color:var(--muted)}
+.field input{height:52px;border-radius:12px;border:1px solid var(--line);background:var(--panel);color:var(--text);padding:0 14px;font-size:17px;outline:none;-webkit-user-select:text;user-select:text}
+.field input:focus{border-color:var(--accent)}
+.opt{display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 14px;text-align:left}
+.opt small{display:block;color:var(--muted);font-size:13px;margin-top:3px;line-height:1.35}
+.sw{width:52px;height:30px;border-radius:15px;background:#2a3748;position:relative;flex:none;transition:.2s}
+.sw::after{content:"";position:absolute;left:3px;top:3px;width:24px;height:24px;border-radius:50%;background:#fff;transition:.2s}
+.sw.on{background:var(--hit)} .sw.on::after{left:25px}
+.pagehead{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+.pagehead h2{font-size:22px}
+.content{max-width:640px;width:100%;margin:0 auto;display:flex;flex-direction:column;gap:12px;padding-bottom:24px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;line-height:1.55;font-size:15px}
+.card h3{font-size:16px;margin-bottom:6px}
+.card p{margin:6px 0}
+.example{display:flex;align-items:center;gap:12px;margin:10px 0;flex-wrap:wrap}
+.example .row{flex:1;min-width:250px}
+
+/* sheet */
+.veil{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center;z-index:20;animation:fade .2s}
+.sheet{background:var(--panel);border:1px solid var(--line);border-radius:22px 22px 0 0;width:100%;max-width:520px;padding:20px 16px calc(20px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:10px;animation:up .25s}
+@media (min-width:720px){.veil{align-items:center}.sheet{border-radius:22px}}
+@keyframes fade{from{opacity:0}} @keyframes up{from{transform:translateY(40px);opacity:0}}
+
+/* banner */
+.banner{position:fixed;inset:0;display:grid;place-items:center;pointer-events:none;z-index:30}
+.banner div{padding:18px 28px;border-radius:18px;background:rgba(17,24,35,.95);border:1px solid var(--line);font-size:24px;font-weight:800;animation:banner 1.3s both}
+@keyframes banner{0%{opacity:0;transform:scale(.8)}15%{opacity:1;transform:scale(1)}75%{opacity:1}100%{opacity:0;transform:scale(1.05)}}
+
+/* over */
+.trophy{font-size:64px;margin-bottom:8px}
+.codes{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin:18px 0}
+.codes .card{min-width:150px;text-align:center}
+.codes .code{font:800 30px var(--mono);letter-spacing:.2em;margin-top:6px}
+.score{font-size:15px;color:var(--muted);margin-bottom:22px}
+.score b{font:800 22px var(--mono);color:var(--text);margin:0 6px}
+.confetti{position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:5}
+.confetti i{position:absolute;top:-20px;width:9px;height:14px;border-radius:2px;animation:fall linear forwards}
+@keyframes fall{to{transform:translateY(110vh) rotate(720deg)}}
+.boards{display:grid;gap:14px}
+@media (min-width:720px){.boards{grid-template-columns:1fr 1fr}}
+.boards .histwrap{min-height:0}
+
+/* online */
+.gamelist{display:flex;flex-direction:column;gap:8px}
+.gitem{display:flex;align-items:center;gap:12px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 14px;text-align:left;width:100%}
+.gitem .av{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;font-weight:800;color:#07101a;background:var(--p1);flex:none}
+.gitem .gt{flex:1;min-width:0}
+.gitem .gt b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gitem .gt small{color:var(--muted);font-size:13px}
+.badge{font-size:12px;font-weight:700;padding:5px 10px;border-radius:99px;background:var(--panel2);color:var(--muted);flex:none;white-space:nowrap}
+.badge.go{background:var(--hit);color:#03170e}
+.joincode{font:800 clamp(40px,12vw,64px)/1.1 var(--mono);letter-spacing:.18em;color:var(--hit);margin:10px 0 4px}
+.spin{width:16px;height:16px;border:2.5px solid var(--line);border-top-color:var(--accent);border-radius:50%;display:inline-block;animation:spin 1s linear infinite;vertical-align:-3px;margin-right:8px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.waiting{margin:10px 0 6px;font-weight:600}
+.minitabs{display:flex;gap:6px;margin-top:8px}
+.minitabs button{flex:1;height:34px;border-radius:9px;background:var(--panel2);color:var(--muted);font-size:13px;font-weight:600;border:1px solid transparent;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 6px}
+.minitabs button.on{color:var(--text);border-color:var(--line);background:#1d2a3b}
+.note{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 14px;font-size:14px;color:var(--muted);line-height:1.45;text-align:left}
+.note b{color:var(--text)}
+.note .btn{margin-top:10px;min-height:44px;font-size:15px}
+.sectionlabel{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin:12px 2px 0}
+.field input.code-in{text-transform:uppercase;letter-spacing:.3em;font-family:var(--mono);font-size:26px;text-align:center}
+.err{color:var(--danger);font-size:14px;text-align:center;min-height:20px}
+.opp.tap{cursor:pointer}
+.homebadge{background:var(--hit);color:#03170e;border-radius:99px;font-size:12px;padding:3px 9px;font-weight:800}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+'use strict';
+const $app = document.getElementById('app');
+
+/* ---------- storage ---------- */
+const LS = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
+  del(k) { try { localStorage.removeItem(k); } catch (e) {} }
+};
+const settings = Object.assign({ repeats: true, sound: true, haptics: true, assist: false }, LS.get('cb.settings', {}));
+let names = LS.get('cb.names', ['Player 1', 'Player 2']);
+let wins = LS.get('cb.wins', {});          // name -> games won (pass-the-phone games)
+let game = LS.get('cb.game', null);        // the current pass-the-phone game
+let me = LS.get('cb.me', null);            // online identity: {id, secret, name}
+const saveGame = () => game ? LS.set('cb.game', game) : LS.del('cb.game');
+const saveSettings = () => LS.set('cb.settings', settings);
+
+/* ---------- online config ---------- */
+const API = 'https://qivhqwkkgvmkgmmguaqd.supabase.co';
+const KEY = 'sb_publishable_je2bb5SaoGDB2YMFKU8ogw_Y_Y0kf2R';
+const VAPID = 'BBPtmx9Y4AHGszo0Lc0gLQc7sqsRK8qZsAhYw8czKqalJeCX36NBI30XVuXsXSpghyfZZGrMMxiVUVXCjFHuvdU';
+const SITE = 'https://nickjohn117.github.io/codebreaker/';
+
+/* ---------- ui state (not persisted) ---------- */
+const ui = { view: 'home', back: 'home', sheet: null, entry: [null, null, null, null], cursor: 0,
+  msg: '', msgType: '', shake: false, fresh: false, tool: 'keys', reveal: false,
+  codeMode: false, codeRepeats: true, typing: false, peekCode: '',
+  olist: null, og: null, ogId: null, oerr: '', busy: false, ocode: null, otab: 'mine', onotes: null, pushOk: false, joinPrefill: '' };
+
+/* ---------- helpers ---------- */
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const other = p => 1 - p;
+const plural = (n, w) => n + ' ' + w + (n === 1 ? '' : 'es');
+function score(g, s) {
+  let exact = 0; const cg = new Array(10).fill(0), cs = new Array(10).fill(0);
+  for (let i = 0; i < 4; i++) { if (g[i] === s[i]) exact++; cg[+g[i]]++; cs[+s[i]]++; }
+  let common = 0; for (let d = 0; d < 10; d++) common += Math.min(cg[d], cs[d]);
+  return [exact, common - exact];
+}
+const hasRepeat = c => new Set(c).size < c.length;
+function candidates(guesses, repeats) {
+  let n = 0;
+  for (let i = 0; i < 10000; i++) {
+    const s = String(i).padStart(4, '0');
+    if (!repeats && hasRepeat(s)) continue;
+    let ok = true;
+    for (const g of guesses) { const [e, m] = score(g.g, s); if (e !== g.e || m !== g.n) { ok = false; break; } }
+    if (ok) n++;
+  }
+  return n;
+}
+function consistent(code, guesses, repeats) {
+  if (!repeats && hasRepeat(code)) return false;
+  return guesses.every(g => { const [e, n] = score(g.g, code); return e === g.e && n === g.n; });
+}
+function pegs(e, n) {
+  let h = '<div class="pegs" aria-label="' + e + ' right spot, ' + n + ' wrong spot">';
+  for (let i = 0; i < 4; i++) {
+    const c = i < e ? 'hit' : i < e + n ? 'near' : '';
+    h += '<span class="peg ' + c + '" style="animation-delay:' + (i * 90) + 'ms"></span>';
+  }
+  return h + '</div>';
+}
+const bestOf = list => list.reduce((b, x) => (x.e * 10 + x.n > b.e * 10 + b.n ? x : b), { e: 0, n: 0 });
+const mkNotes = () => ({ digits: new Array(10).fill(0), grid: new Array(40).fill(0) });
+const resetEntry = () => { ui.entry = [null, null, null, null]; ui.cursor = 0; ui.msg = ''; ui.reveal = false; };
+const entryStr = () => ui.entry.every(d => d !== null) ? ui.entry.join('') : null;
+const pColor = p => p === 0 ? 'var(--p0)' : 'var(--p1)';
+const initial = n => esc((String(n || '?').trim()[0] || '?').toUpperCase());
+
+/* ---------- sound & haptics ---------- */
+let actx = null;
+function tone(freq, dur, type, gain, delay) {
+  if (!settings.sound) return;
+  try {
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+    if (actx.state === 'suspended') actx.resume();
+    const t = actx.currentTime + (delay || 0);
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.type = type || 'sine'; o.frequency.value = freq;
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(gain || 0.08, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(actx.destination); o.start(t); o.stop(t + dur + 0.02);
+  } catch (e) {}
+}
+function buzz(p) { if (settings.haptics && navigator.vibrate) try { navigator.vibrate(p); } catch (e) {} }
+const sfx = {
+  key() { tone(620, 0.05, 'triangle', 0.04); buzz(8); },
+  back() { tone(380, 0.05, 'triangle', 0.04); buzz(8); },
+  err() { tone(160, 0.18, 'square', 0.05); buzz([30, 40, 30]); },
+  lock() { tone(440, 0.08, 'triangle', 0.07); tone(660, 0.12, 'triangle', 0.07, 0.08); buzz(25); },
+  result(e, n) {
+    for (let i = 0; i < 4; i++) {
+      const f = i < e ? 880 : i < e + n ? 587 : 220;
+      tone(f, 0.12, i < e + n ? 'sine' : 'triangle', i < e + n ? 0.08 : 0.03, i * 0.09);
+    }
+    buzz(e + n ? [15, 60, 15] : 20);
+  },
+  turn() { tone(660, 0.1, 'sine', 0.07); tone(990, 0.16, 'sine', 0.07, 0.1); buzz([20, 50, 20]); },
+  win() { [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, 0.25, 'sine', 0.09, i * 0.1)); buzz([40, 60, 40, 60, 120]); },
+  lose() { [392, 330, 262].forEach((f, i) => tone(f, 0.25, 'triangle', 0.07, i * 0.14)); buzz(80); }
+};
+
+/* ================= pass-the-phone game ================= */
+function newGame(n0, n1, repeats, first) {
+  names = [n0, n1]; LS.set('cb.names', names);
+  settings.repeats = repeats; saveSettings();
+  const starter = first === 2 ? (Math.random() < 0.5 ? 0 : 1) : first;
+  game = { v: 1, names: [n0, n1], repeats, starter, turn: starter, phase: 'cover', cover: { p: 0, then: 'code' },
+    codes: ['', ''], guesses: [[], []], notes: [mkNotes(), mkNotes()], winner: null, pending: null };
+  saveGame(); resetEntry(); ui.view = 'game'; render();
+}
+function rematch() {
+  // the player who lost gets to go first next time
+  const g = game; const first = g.winner === null ? g.starter : other(g.winner);
+  newGame(g.names[0], g.names[1], g.repeats, first);
+}
+function lockCode() {
+  const c = entryStr();
+  if (!c) return;
+  if (!game.repeats && hasRepeat(c)) { flash('No repeated digits in this game.'); return; }
+  const p = game.cover.p;
+  game.codes[p] = c; sfx.lock();
+  if (p === 0) game.cover = { p: 1, then: 'code' };
+  else game.cover = { p: game.starter, then: 'play' };
+  game.phase = 'cover'; saveGame(); resetEntry(); render();
+}
+function submitGuess() {
+  const g = entryStr(); const p = game.turn;
+  if (!g) { flash('Fill all 4 digits first.'); return; }
+  if (game.guesses[p].some(x => x.g === g)) { flash('You already guessed ' + g + '.'); return; }
+  const [e, n] = score(g, game.codes[other(p)]);
+  game.guesses[p].push({ g, e, n });
+  ui.fresh = true; resetEntry();
+  if (e === 4) {
+    game.winner = p; game.phase = 'over';
+    wins[game.names[p]] = (wins[game.names[p]] || 0) + 1; LS.set('cb.wins', wins);
+    game.pending = { win: true, e, n };
+    sfx.result(4, 0); setTimeout(sfx.win, 450);
+  } else {
+    game.pending = { win: false, e, n }; sfx.result(e, n);
+  }
+  saveGame(); render();
+}
+function passTurn() {
+  game.pending = null; ui.tool = 'keys';
+  if (game.phase === 'over') { saveGame(); ui.view = 'game'; render(); confetti(); return; }
+  game.turn = other(game.turn); saveGame(); render();
+  showBanner(esc(game.names[game.turn]) + "'s turn", pColor(game.turn));
+}
+function flash(m, type) {
+  ui.msg = m; ui.msgType = type || ''; ui.shake = !type; if (!type) sfx.err(); render(); ui.shake = false;
+}
+
+/* ---------- boards: what the play screen shows, for either mode ---------- */
+function localBoard() {
+  const p = game.turn;
+  return { p, names: game.names, mine: game.guesses[p], theirs: game.guesses[other(p)], notes: game.notes[p],
+    save: saveGame, myCode: game.codes[p], repeats: game.repeats };
+}
+function onlineBoard() {
+  const st = ui.og, p = st.me;
+  if (!ui.onotes || ui.onotes.id !== st.id) ui.onotes = { id: st.id, notes: LS.get('cb.on.' + st.id, mkNotes()) };
+  const id = st.id;
+  return { p, names: st.names, mine: st.guesses.filter(x => x.p === p), theirs: st.guesses.filter(x => x.p !== p),
+    notes: ui.onotes.notes, save: () => LS.set('cb.on.' + id, ui.onotes.notes), myCode: st.my_code, repeats: st.repeats };
+}
+function curBoard() {
+  if (ui.view === 'oGame') return ui.og && ui.og.status === 'play' ? onlineBoard() : null;
+  return game ? localBoard() : null;
+}
+
+/* ---------- input ---------- */
+function press(d) {
+  if (ui.cursor > 3) return;
+  if (ui.codeMode && !ui.codeRepeats && ui.entry.some((x, i) => x === d && i !== ui.cursor)) { flash('No repeated digits in this game.'); return; }
+  ui.entry[ui.cursor] = d; sfx.key();
+  let next = 4;
+  for (let k = 1; k <= 4; k++) { const i = (ui.cursor + k) % 4; if (ui.entry[i] === null) { next = i; break; } }
+  ui.cursor = next; ui.msg = ''; render();
+}
+function backspace() {
+  if (ui.cursor < 4 && ui.entry[ui.cursor] !== null) ui.entry[ui.cursor] = null;
+  else if (ui.cursor > 0) { ui.cursor--; ui.entry[ui.cursor] = null; }
+  else return;
+  sfx.back(); ui.msg = ''; render();
+}
+
+/* ---------- shared pieces ---------- */
+function slotsHtml(hide, hint) {
+  const msg = ui.msg || hint || '', type = ui.msg ? ui.msgType : 'info';
+  return `<div class="slots ${ui.shake ? 'shake' : ''}">${ui.entry.map((d, i) =>
+    `<button class="tile ${i === ui.cursor ? 'cur' : ''} ${hide && d !== null ? 'dot' : ''}" data-act="slot" data-i="${i}">${d === null ? '' : hide ? '●' : d}</button>`).join('')}</div>
+    <div class="msg ${type}">${esc(msg)}</div>`;
+}
+function keypad(goLabel, goReady, notes) {
+  ui.typing = true;
+  const st = d => notes ? ['', 'out', 'in'][notes.digits[d]] : '';
+  const dis = d => ui.codeMode && !ui.codeRepeats && ui.entry.some((x, i) => x === d && i !== ui.cursor);
+  const k = d => `<button class="key ${st(d)}" data-act="key" data-d="${d}" ${dis(d) ? 'disabled' : ''}>${d}</button>`;
+  return `<div class="keys">${[1, 2, 3, 4, 5, 6, 7, 8, 9].map(k).join('')}
+    <button class="key back" data-act="bksp" aria-label="Delete">⌫</button>${k(0)}
+    <button class="key go" data-act="go" ${goReady && !ui.busy ? '' : 'disabled'}>${ui.busy ? '…' : goLabel}</button></div>`;
+}
+function codeEntry(o) {
+  // o: {left (button html), title, sub, note, repeats}
+  ui.codeMode = true; ui.codeRepeats = o.repeats;
+  return `<div class="screen">
+    <div class="topbar">${o.left}
+      <div class="t"><h2>${o.title}</h2><div>4 digits, 0–9. ${o.repeats ? 'Repeats allowed.' : 'No repeated digits.'}</div></div></div>
+    <div style="flex:1;display:flex;flex-direction:column;justify-content:center;max-width:460px;width:100%;margin:0 auto">
+      <p class="muted" style="text-align:center;margin:0 0 18px;line-height:1.5">${o.note}</p>
+      ${slotsHtml(!ui.reveal)}
+      <div style="display:flex;justify-content:center;margin-bottom:14px"><button class="peek" data-act="reveal">${ui.reveal ? 'Hide code' : 'Show code'}</button></div>
+      ${keypad('Lock in', !!entryStr(), null)}
+    </div></div>`;
+}
+function historyHtml(list, freshLast, emptyNote, tabs) {
+  const rows = list.map((x, i) => {
+    const isNew = freshLast && i === list.length - 1;
+    return `<div class="row ${x.e === 4 ? 'win' : ''} ${isNew ? 'new' : ''}">
+      <span class="n">${i + 1}</span><div class="d">${x.g.split('').map(c => `<span>${c}</span>`).join('')}</div>
+      ${x.e + x.n === 0 ? '<span class="zero">none</span>' : ''}${pegs(x.e, x.n)}</div>`;
+  }).join('');
+  return `<div class="histwrap">
+    <div class="legend"><span><i class="hit"></i>right number, right spot</span><span><i class="near"></i>right number, wrong spot</span></div>
+    ${tabs || ''}
+    <div class="history" id="hist">${rows || `<div class="empty">No guesses yet.${emptyNote ? '<br>' + emptyNote : ''}</div>`}</div></div>`;
+}
+function toolsHtml(nt) {
+  const chips = nt.digits.map((s, d) => `<button class="chip s${s}" data-act="note" data-d="${d}">${d}</button>`).join('');
+  let grid = '<div class="grid"><span></span>' + [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(d => `<span class="lab mono">${d}</span>`).join('');
+  for (let pos = 0; pos < 4; pos++) {
+    grid += `<span class="lab">spot ${pos + 1}</span>`;
+    for (let d = 0; d < 10; d++) {
+      const s = nt.grid[pos * 10 + d];
+      grid += `<button class="cell s${s}" data-act="cell" data-i="${pos * 10 + d}">${s === 1 ? '✕' : s === 2 ? '✓' : ''}</button>`;
+    }
+  }
+  return { chips, grid: grid + '</div>' };
+}
+const notesHead = `<div class="toolhead"><span>Digit notes · tap to ✕ or ✓</span><button data-act="clearnotes">Clear</button></div>`;
+function guessControls(b) {
+  const t = toolsHtml(b.notes), entry = entryStr();
+  const warn = settings.assist && entry && !consistent(entry, b.mine, b.repeats) ? `Heads up: ${entry} can't be the code based on your clues.` : '';
+  const grid = ui.tool === 'grid';
+  // narrow screens switch between keypad and grid; wide screens (unfolded) show both
+  return `${slotsHtml(false, warn)}
+    ${notesHead}<div class="notes">${t.chips}</div>
+    <div class="seg narrowonly">
+      <button data-act="tool" data-v="keys" class="${grid ? '' : 'on'}">Keypad</button>
+      <button data-act="tool" data-v="grid" class="${grid ? 'on' : ''}">Spot grid</button></div>
+    <div class="${grid ? 'wideonly' : ''}">${keypad('Guess', !!entry, b.notes)}</div>
+    <div class="${grid ? '' : 'wideonly'}"><div class="toolhead wideonly"><span>Spot grid — which digit could go where</span></div>${t.grid}</div>`;
+}
+function assistHtml(b) {
+  if (!settings.assist) return '';
+  const n = candidates(b.mine, b.repeats);
+  return `<div class="assist">${n.toLocaleString()} possible code${n === 1 ? '' : 's'} left</div>`;
+}
+
+/* ---------- pass-the-phone views ---------- */
+function vHome() {
+  const cont = game && (game.phase !== 'over' || game.pending);
+  const w0 = wins[names[0]] || 0, w1 = wins[names[1]] || 0;
+  const yt = yourTurnCount();
+  return `<div class="screen center">
+    <div class="logopegs pegs" style="--pg:26px"><span class="peg hit"></span><span class="peg near"></span><span class="peg hit"></span><span class="peg"></span></div>
+    <div class="logo">CODE<span>BREAKER</span></div>
+    <div class="tag muted">Crack their code before they crack yours.</div>
+    <div class="stack">
+      ${cont ? `<button class="btn primary" data-act="continue">Continue game</button>` : ''}
+      <button class="btn ${cont ? '' : 'primary'}" data-act="new">Pass-the-phone game</button>
+      <button class="btn" data-act="online">Play online ${yt ? `<span class="homebadge">${yt} your turn</span>` : ''}</button>
+      <button class="btn" data-act="rules">How to play</button>
+      <button class="btn" data-act="settings">Settings</button>
+    </div>
+    ${(w0 || w1) ? `<div class="score" style="margin-top:26px">${esc(names[0])}<b>${w0}</b>–<b>${w1}</b>${esc(names[1])}</div>` : ''}
+  </div>`;
+}
+function vNew() {
+  const r = settings.repeats;
+  const first = ui.first === undefined ? 0 : ui.first;
+  return `<div class="screen scroll"><div class="content">
+    <div class="pagehead"><button class="iconbtn" data-act="home">‹</button><h2>Pass-the-phone game</h2></div>
+    <div class="field"><label>Player 1</label><input id="n0" maxlength="14" value="${esc(names[0])}" autocomplete="off"></div>
+    <div class="field"><label>Player 2</label><input id="n1" maxlength="14" value="${esc(names[1])}" autocomplete="off"></div>
+    ${repeatsOpt('toggleNewRep')}
+    <div class="field"><label>Who guesses first?</label>
+      <div class="seg" style="margin:0">
+        <button data-act="first" data-v="0" class="${first === 0 ? 'on' : ''}">Player 1</button>
+        <button data-act="first" data-v="1" class="${first === 1 ? 'on' : ''}">Player 2</button>
+        <button data-act="first" data-v="2" class="${first === 2 ? 'on' : ''}">Random</button>
+      </div></div>
+    <button class="btn primary" data-act="start" style="margin-top:8px">Start — pick secret codes</button>
+  </div></div>`;
+}
+function repeatsOpt(act) {
+  const r = settings.repeats;
+  return `<button class="opt" data-act="${act}"><div><b>Repeated digits in codes</b><small>${r ? 'Allowed — codes like 3303 are fine.' : 'Not allowed — every digit in a code is different.'}</small></div><span class="sw ${r ? 'on' : ''}"></span></button>`;
+}
+function vCover() {
+  const c = game.cover, p = c.p, nm = esc(game.names[p]), op = esc(game.names[other(p)]);
+  let title, text, btn;
+  if (c.then === 'code') {
+    title = `Pass the phone to ${nm}`;
+    text = `${nm}, you're choosing your secret 4-digit code.<br><b style="color:var(--text)">${op}, look away!</b>`;
+    btn = `I'm ${nm} — pick my code`;
+  } else {
+    title = `Codes are locked in`;
+    text = `${nm} guesses first. Pass the phone to ${nm}.`;
+    btn = `I'm ${nm} — start`;
+  }
+  return `<div class="screen center cover">
+    <div class="avatar" style="background:${pColor(p)}">${initial(game.names[p])}</div>
+    <h1>${title}</h1><p>${text}</p>
+    <div class="stack"><button class="btn primary" data-act="uncover">${btn}</button></div>
+  </div>`;
+}
+function vCode() {
+  const p = game.cover.p;
+  return codeEntry({ left: `<button class="iconbtn" data-act="menu">≡</button>`,
+    title: `<span style="color:${pColor(p)}">${esc(game.names[p])}</span>, set your code`,
+    note: `${esc(game.names[other(p)])} will try to crack this. Pick something you can remember!`, repeats: game.repeats });
+}
+function vPlay() {
+  const b = localBoard(), p = b.p, o = other(p), nm = esc(b.names[p]), on = esc(b.names[o]);
+  const fresh = ui.fresh; ui.fresh = false;
+  ui.peekCode = b.myCode;
+  let controls;
+  if (game.pending) {
+    const r = game.pending;
+    controls = r.win
+      ? `<div class="result"><h2 style="color:var(--hit);margin-bottom:6px">Code cracked!</h2>
+          <p class="muted" style="margin:0 0 16px">${nm} broke ${on}'s code in ${plural(b.mine.length, 'guess')}.</p>
+          <button class="btn hit" data-act="pass">See results</button></div>`
+      : `<div class="result"><div class="big">
+            <div><strong style="color:var(--hit)">${r.e}</strong>right spot</div>
+            <div><strong style="color:var(--near)">${r.n}</strong>wrong spot</div></div>
+          <button class="btn primary" data-act="pass">Done — pass to ${on}</button></div>`;
+  } else controls = guessControls(b);
+  const best = bestOf(b.theirs);
+  return `<div class="screen">
+    <div class="topbar"><button class="iconbtn" data-act="menu">≡</button>
+      <div class="t"><h2><span style="color:${pColor(p)}">${nm}</span>'s turn</h2><div>Guess #${b.mine.length + (game.pending ? 0 : 1)} · cracking ${on}'s code</div></div>
+      <button class="peek" id="peek">My code</button></div>
+    <div class="opp"><span><b style="color:${pColor(o)}">${on}</b> has made ${plural(b.theirs.length, 'guess')} on your code</span>${b.theirs.length ? `<span class="muted">best</span>${pegs(best.e, best.n)}` : ''}</div>
+    <div class="play">
+      <div class="left">${historyHtml(b.mine, fresh, 'Enter 4 digits below and tap Guess.')}${assistHtml(b)}</div>
+      <div class="controls">${controls}</div>
+    </div></div>`;
+}
+function vOver() {
+  const w = game.winner, l = other(w);
+  const w0 = wins[game.names[0]] || 0, w1 = wins[game.names[1]] || 0;
+  return `<div class="screen center scroll">
+    <div class="trophy">🏆</div>
+    <h1 style="font-size:clamp(26px,7vw,40px)"><span style="color:${pColor(w)}">${esc(game.names[w])}</span> wins!</h1>
+    <p class="muted" style="margin:8px 0 0">Cracked the code in ${plural(game.guesses[w].length, 'guess')}.
+      ${esc(game.names[l])} made ${game.guesses[l].length}.</p>
+    ${codesCards(game.names, game.codes)}
+    <div class="score">${esc(game.names[0])}<b>${w0}</b>–<b>${w1}</b>${esc(game.names[1])}</div>
+    <div class="stack">
+      <button class="btn primary" data-act="rematch">Rematch (${esc(game.names[l])} goes first)</button>
+      <button class="btn" data-act="review">Review both boards</button>
+      <button class="btn" data-act="home">Home</button>
+    </div></div>`;
+}
+function codesCards(nms, codes) {
+  return `<div class="codes">
+    <div class="card"><div class="muted" style="font-size:13px">${esc(nms[0])}'s code</div><div class="code" style="color:var(--p0)">${codes[0]}</div></div>
+    <div class="card"><div class="muted" style="font-size:13px">${esc(nms[1])}'s code</div><div class="code" style="color:var(--p1)">${codes[1]}</div></div></div>`;
+}
+function reviewScreen(nms, codes, lists, backAct) {
+  const board = p => `<div style="display:flex;flex-direction:column;min-height:0">
+    <h3 style="margin:0 0 8px;font-size:15px"><span style="color:${pColor(p)}">${esc(nms[p])}</span> guessing ${esc(nms[other(p)])}'s code <span class="mono muted">(${codes[other(p)]})</span></h3>
+    ${historyHtml(lists[p], false, '')}</div>`;
+  return `<div class="screen scroll">
+    <div class="pagehead"><button class="iconbtn" data-act="${backAct}">‹</button><h2>Both boards</h2></div>
+    <div class="boards">${board(0)}${board(1)}</div></div>`;
+}
+const vReview = () => reviewScreen(game.names, game.codes, game.guesses, 'backover');
+
+/* ---------- rules / settings / sheets ---------- */
+function vRules() {
+  return `<div class="screen scroll"><div class="content">
+    <div class="pagehead"><button class="iconbtn" data-act="goback">‹</button><h2>How to play</h2></div>
+    <div class="card"><h3>1. Set your secret codes</h3>
+      <p>Each player secretly picks a 4-digit code using the numbers 0–9.</p></div>
+    <div class="card"><h3>2. Take turns guessing</h3>
+      <p>On your turn, guess your opponent's code. The game marks your guess with two kinds of icons:</p>
+      <div class="legend" style="flex-direction:column;align-items:flex-start;gap:8px;font-size:15px;color:var(--text)">
+        <span><i class="hit"></i>a right number in the right spot</span>
+        <span><i class="near"></i>a right number in the wrong spot</span></div>
+      <p>It never tells you <i>which</i> numbers they are — that's for you to work out.</p></div>
+    <div class="card"><h3>Example</h3>
+      <p>The secret code is <b class="mono">3509</b>. You guess <b class="mono">4592</b>:</p>
+      <div class="example"><div class="row"><span class="n">1</span><div class="d"><span>4</span><span>5</span><span>9</span><span>2</span></div>${pegs(1, 1)}</div></div>
+      <p>The 5 is right and in the right spot (●). The 9 is in the code but in the wrong spot (○). You see one of each — not which digit is which.</p></div>
+    <div class="card"><h3>3. First to crack it wins</h3>
+      <p>All your past guesses and their icons stay listed on your turn. Use them to narrow it down. The first player to guess the full code wins.</p></div>
+    <div class="card"><h3>Two ways to play</h3>
+      <p><b>Pass the phone:</b> both players share one phone. The game hides each code while you hand it over.</p>
+      <p><b>Online:</b> each player uses their own phone, anywhere. One player creates a game and sends the 5-letter join code; the other enters it. Take your turns whenever — turn alerts buzz you when it's your move. Secret codes are kept on the server, so nobody's phone ever sees the other's code until the game ends.</p></div>
+    <div class="card"><h3>Tools</h3>
+      <p><b>Digit notes:</b> tap a number once to cross it out, again to mark it as definitely in the code, again to clear. The keypad shows your marks too.</p>
+      <p><b>Spot grid:</b> track which digit can or can't go in each of the 4 spots.</p>
+      <p><b>My code:</b> hold it to peek at your own secret code.</p>
+      <p><b>Code counter</b> (optional, in Settings): shows how many codes still fit your clues and warns you when a guess can't be right.</p></div>
+  </div></div>`;
+}
+function vSettings() {
+  const opt = (k, title, sub) => `<button class="opt" data-act="set" data-k="${k}"><div><b>${title}</b><small>${sub}</small></div><span class="sw ${settings[k] ? 'on' : ''}"></span></button>`;
+  return `<div class="screen scroll"><div class="content">
+    <div class="pagehead"><button class="iconbtn" data-act="goback">‹</button><h2>Settings</h2></div>
+    ${opt('sound', 'Sound effects', 'Clicks, result chimes and a victory tune.')}
+    ${opt('haptics', 'Vibration', 'Little buzzes on key taps and results.')}
+    ${opt('assist', 'Code counter (helper)', 'Shows how many codes still fit your clues, and warns when a guess can\'t be right. Makes the game easier.')}
+    ${me ? `<button class="opt" data-act="oname"><div><b>Online name</b><small>${esc(me.name)} — tap to change</small></div></button>` : ''}
+    <button class="btn danger" data-act="resetwins" style="margin-top:10px">Reset pass-the-phone win tally</button>
+  </div></div>`;
+}
+const sheet = inner => `<div class="veil" data-act="closesheet"><div class="sheet" data-stop="1">${inner}</div></div>`;
+function vSheet() {
+  switch (ui.sheet) {
+    case 'menu': return sheet(`
+      <button class="btn primary" data-act="closesheet">Resume</button>
+      <button class="btn" data-act="rules">How to play</button>
+      <button class="btn" data-act="settings">Settings</button>
+      <button class="btn" data-act="homekeep">Home (game is saved)</button>
+      <button class="btn danger" data-act="quit">Quit this game</button>`);
+    case 'confirm': return sheet(`
+      <h2 style="margin-bottom:4px">Quit this game?</h2><p class="muted" style="margin:0 0 8px">Both codes and all guesses will be lost.</p>
+      <button class="btn danger" data-act="quityes">Yes, quit</button>
+      <button class="btn" data-act="closesheet">Keep playing</button>`);
+    case 'omenu': {
+      const live = ui.og && (ui.og.status === 'play' || ui.og.status === 'codes');
+      return sheet(`
+      <button class="btn primary" data-act="closesheet">Resume</button>
+      <button class="btn" data-act="olist">Back to my games</button>
+      <button class="btn" data-act="rules">How to play</button>
+      <button class="btn" data-act="settings">Settings</button>
+      ${live ? `<button class="btn danger" data-act="oresign">Give up this game</button>` : ''}`);
+    }
+    case 'oresign': return sheet(`
+      <h2 style="margin-bottom:4px">Give up?</h2><p class="muted" style="margin:0 0 8px">${esc(oppName())} wins and both codes are revealed.</p>
+      <button class="btn danger" data-act="oresignyes">Yes, give up</button>
+      <button class="btn" data-act="closesheet">Keep playing</button>`);
+    default: return '';
+  }
+}
+
+/* ================= online ================= */
+async function rpc(fn, body) {
+  let r;
+  try {
+    r = await fetch(API + '/rest/v1/rpc/' + fn, { method: 'POST', headers: { apikey: KEY, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  } catch (e) { throw new Error("Can't reach the server — check your internet connection."); }
+  const t = await r.text(); let j = null; try { j = t ? JSON.parse(t) : null; } catch (e) {}
+  if (!r.ok) {
+    const m = (j && j.message) || 'Something went wrong (' + r.status + ')';
+    if (m === 'Unknown player') { me = null; LS.del('cb.me'); }
+    throw new Error(m);
+  }
+  return j;
+}
+function notify(gameId, kind) {
+  if (!me) return;
+  fetch(API + '/functions/v1/cb-notify', { method: 'POST', headers: { apikey: KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ secret: me.secret, game: gameId, kind }) }).catch(() => {});
+}
+const oppName = () => (ui.og && ui.og.names[other(ui.og.me)]) || 'Your opponent';
+function yourAction(x) { return (x.status === 'play' && x.turn === x.me) || (x.status === 'codes' && !x.my_code_set); }
+function yourTurnCount() { return (ui.olist || []).filter(yourAction).length; }
+function updateBadge() {
+  const n = yourTurnCount();
+  try { if (navigator.setAppBadge) { n ? navigator.setAppBadge(n) : navigator.clearAppBadge(); } } catch (e) {}
+}
+
+/* turn alerts (web push) */
+const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const standalone = () => (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+const pushSupported = () => location.protocol === 'https:' && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+function b64u(s) {
+  const p = '='.repeat((4 - s.length % 4) % 4), b = atob((s + p).replace(/-/g, '+').replace(/_/g, '/'));
+  return Uint8Array.from(b, c => c.charCodeAt(0));
+}
+async function subscribePush() {
+  const reg = await navigator.serviceWorker.ready;
+  let sub = await reg.pushManager.getSubscription();
+  if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64u(VAPID) });
+  const j = sub.toJSON();
+  await rpc('cb_push_add', { p_secret: me.secret, p_endpoint: j.endpoint, p_p256dh: j.keys.p256dh, p_auth: j.keys.auth });
+  ui.pushOk = true;
+}
+async function enablePush() {
+  try {
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') { render(); return; }
+    await subscribePush(); sfx.lock();
+  } catch (e) { ui.oerr = 'Could not turn on alerts: ' + e.message; }
+  render();
+}
+function alertsCard() {
+  if (location.protocol === 'file:')
+    return `<div class="note"><b>Turn alerts</b> aren't available in this installed version — it checks for moves while it's open. For buzzes when the app is closed, install Codebreaker from <b>${SITE.replace('https://', '')}</b> in Chrome.</div>`;
+  if (isIOS && !standalone())
+    return `<div class="note"><b>Want a buzz when it's your turn?</b> Add Codebreaker to your Home Screen first: tap the <b>Share</b> button, then <b>Add to Home Screen</b>. Open it from the new icon and turn on alerts there.</div>`;
+  if (!pushSupported()) return `<div class="note">This browser can't show turn alerts. The game still checks for moves while it's open.</div>`;
+  if (Notification.permission === 'granted' && ui.pushOk) return `<div class="note">🔔 <b>Turn alerts are on.</b> You'll get a buzz when it's your move.</div>`;
+  if (Notification.permission === 'denied')
+    return `<div class="note"><b>Turn alerts are blocked.</b> Turn on notifications for Codebreaker in your phone's settings to get a buzz on your turn.</div>`;
+  return `<div class="note"><b>Get a buzz when it's your turn</b> — even when the app is closed.<button class="btn primary" data-act="opush">Turn on turn alerts</button></div>`;
+}
+
+/* online views */
+function vOName() {
+  return `<div class="screen scroll"><div class="content">
+    <div class="pagehead"><button class="iconbtn" data-act="${me ? 'goback' : 'home'}">‹</button><h2>${me ? 'Your online name' : 'Play online'}</h2></div>
+    ${me ? '' : `<p class="muted" style="margin:0;line-height:1.5">Play against a friend on their own phone — anywhere. First, what should your opponent see you as?</p>`}
+    <div class="field"><label>Your name</label><input id="oname" maxlength="20" value="${esc(me ? me.name : (names[0] !== 'Player 1' ? names[0] : ''))}" autocomplete="off" placeholder="e.g. Nick"></div>
+    <div class="err">${esc(ui.oerr)}</div>
+    <button class="btn primary" data-act="osavename" ${ui.busy ? 'disabled' : ''}>${me ? 'Save' : 'Continue'}</button>
+  </div></div>`;
+}
+function statusText(x) {
+  const opp = esc(x.opponent || 'Opponent');
+  switch (x.status) {
+    case 'waiting': return ['Waiting for someone to join', `Code ${x.join_code}`, ''];
+    case 'codes': return x.my_code_set ? [opp, `Waiting for their code`, 'Their turn'] : [opp, 'New game — pick your code', 'Your turn'];
+    case 'play': return [opp, `${x.moves} guess${x.moves === 1 ? '' : 'es'} so far`, x.turn === x.me ? 'Your turn' : 'Their turn'];
+    default: return [opp, x.winner === x.me ? 'You won' : `${opp} won`, x.winner === x.me ? '🏆' : ''];
+  }
+}
+function vOnline() {
+  if (!me) return vOName();
+  const list = ui.olist;
+  let items;
+  if (!list) items = `<div class="note"><span class="spin"></span>Loading your games…</div>`;
+  else if (!list.length) items = `<div class="note">No online games yet. Start one and send the join code to a friend, or join theirs.</div>`;
+  else {
+    const sorted = list.slice().sort((a, b) => yourAction(b) - yourAction(a));
+    items = sorted.map(x => {
+      const [t, s, badge] = statusText(x);
+      return `<button class="gitem" data-act="oopen" data-id="${x.id}">
+        <span class="av" style="background:${x.status === 'waiting' ? 'var(--panel2);color:var(--muted)' : 'var(--p1)'}">${x.status === 'waiting' ? '…' : initial(x.opponent)}</span>
+        <span class="gt"><b>${t}</b><small>${s}</small></span>
+        ${badge ? `<span class="badge ${yourAction(x) ? 'go' : ''}">${badge}</span>` : ''}</button>`;
+    }).join('');
+  }
+  return `<div class="screen scroll"><div class="content">
+    <div class="pagehead"><button class="iconbtn" data-act="home">‹</button><h2 style="flex:1">Play online</h2>
+      <button class="peek" data-act="oname" style="min-width:0">${esc(me.name)}</button></div>
+    <div class="stack" style="max-width:none">
+      <button class="btn primary" data-act="onew">New online game</button>
+      <button class="btn" data-act="ojoin">Join with a code</button>
+    </div>
+    ${alertsCard()}
+    <div class="err">${esc(ui.oerr)}</div>
+    <div class="sectionlabel">Your games</div>
+    <div class="gamelist">${items}</div>
+  </div></div>`;
+}
+function vONew() {
+  return `<div class="screen scroll"><div class="content">
+    <div class="pagehead"><button class="iconbtn" data-act="online">‹</button><h2>New online game</h2></div>
+    ${repeatsOpt('toggleNewRep')}
+    <p class="muted" style="margin:0;line-height:1.5">Next you'll pick your secret code. Then you'll get a join code to send to your opponent. A coin flip decides who guesses first.</p>
+    <button class="btn primary" data-act="onewgo">Pick my secret code</button>
+  </div></div>`;
+}
+function vOJoin() {
+  return `<div class="screen scroll"><div class="content">
+    <div class="pagehead"><button class="iconbtn" data-act="online">‹</button><h2>Join a game</h2></div>
+    <p class="muted" style="margin:0;line-height:1.5">Enter the 5-character join code your friend sent you.</p>
+    <div class="field"><input id="ojoin" class="code-in" maxlength="5" autocomplete="off" autocapitalize="characters" spellcheck="false" value="${esc(ui.joinPrefill)}" placeholder="ABCDE"></div>
+    <div class="err">${esc(ui.oerr)}</div>
+    <button class="btn primary" data-act="ojoingo" ${ui.busy ? 'disabled' : ''}>${ui.busy ? 'Looking…' : 'Find game'}</button>
+  </div></div>`;
+}
+function vOCode() {
+  const c = ui.ocode;
+  return codeEntry({ left: `<button class="iconbtn" data-act="online">‹</button>`, title: 'Set your secret code',
+    note: c.mode === 'join' ? `${esc(c.host)} will try to crack this. Pick something you can remember!` : 'Your opponent will try to crack this. Pick something you can remember!',
+    repeats: c.repeats });
+}
+function vOGame() {
+  const st = ui.og;
+  if (!st) return `<div class="screen center"><div class="note" style="max-width:420px">${ui.oerr ? esc(ui.oerr) : '<span class="spin"></span>Loading game…'}</div>
+    <div class="stack" style="margin-top:14px"><button class="btn" data-act="olist">Back to my games</button></div></div>`;
+  const opp = esc(oppName());
+  const top = (title, sub) => `<div class="topbar"><button class="iconbtn" data-act="olist">‹</button>
+    <div class="t"><h2>${title}</h2><div>${sub}</div></div><button class="iconbtn" data-act="omenu">≡</button></div>`;
+  if (st.status === 'waiting') {
+    return `<div class="screen">${top('Waiting for opponent', 'Your code is locked in')}
+      <div class="screen center" style="padding:0"><div class="content" style="align-items:center">
+      <p class="muted" style="margin:0">Send this join code to your opponent:</p>
+      <div class="joincode">${esc(st.join_code)}</div>
+      <p class="muted" style="margin:0 0 6px;line-height:1.5;max-width:380px">They open Codebreaker → <b style="color:var(--text)">Play online</b> → <b style="color:var(--text)">Join with a code</b>.</p>
+      <div class="stack"><button class="btn primary" data-act="oshare">Send invite</button>
+        <button class="btn danger" data-act="ocancel">Cancel this game</button></div>
+      <div class="err">${esc(ui.oerr || ui.msg)}</div>
+      <p class="muted" style="font-size:14px"><span class="spin"></span>Waiting for them to join…</p></div></div></div>`;
+  }
+  if (st.status === 'codes' && !st.my_code) {
+    return codeEntry({ left: `<button class="iconbtn" data-act="olist">‹</button>`, title: 'Rematch: pick your code',
+      note: `${opp} will try to crack it. ${st.starter === st.me ? 'You' : opp} will guess first.`, repeats: st.repeats });
+  }
+  if (st.status === 'codes') {
+    return `<div class="screen">${top('Rematch', 'Your code is locked in')}
+      <div class="screen center"><p class="muted"><span class="spin"></span>Waiting for ${opp} to pick their code…</p>
+      <div class="stack"><button class="btn" data-act="olist">Back to my games</button></div></div></div>`;
+  }
+  if (st.status === 'over') return vOOver(st);
+  return vOPlay(st, top);
+}
+function vOPlay(st, top) {
+  const b = onlineBoard(), opp = esc(oppName()), myTurn = st.turn === st.me;
+  const fresh = ui.fresh; ui.fresh = false;
+  ui.peekCode = b.myCode;
+  const tab = ui.otab;
+  const tabs = `<div class="minitabs">
+    <button data-act="otab" data-v="mine" class="${tab === 'mine' ? 'on' : ''}">My guesses (${b.mine.length})</button>
+    <button data-act="otab" data-v="theirs" class="${tab === 'theirs' ? 'on' : ''}">${opp}'s guesses (${b.theirs.length})</button></div>`;
+  const list = tab === 'mine' ? b.mine : b.theirs;
+  const hist = historyHtml(list, fresh && tab === 'mine', tab === 'mine' ? (myTurn ? 'Enter 4 digits and tap Guess.' : '') : `This is how close ${opp} is to your code <b class="mono">${esc(b.myCode)}</b>.`, tabs);
+  let controls;
+  if (myTurn) controls = guessControls(b);
+  else {
+    const last = b.mine[b.mine.length - 1], t = toolsHtml(b.notes);
+    controls = `<div class="result">
+        ${last ? `<div class="muted" style="font-size:14px">Your guess <b class="mono" style="color:var(--text)">${last.g}</b></div>
+          <div class="big" style="margin-bottom:4px"><div><strong style="color:var(--hit)">${last.e}</strong>right spot</div><div><strong style="color:var(--near)">${last.n}</strong>wrong spot</div></div>` : ''}
+        <div class="waiting"><span class="spin"></span>${opp}'s turn to guess…</div>
+        <div class="muted" style="font-size:13px">${ui.pushOk ? "We'll buzz you when it's your move." : "You can leave — your game is saved."}</div></div>
+      ${notesHead}<div class="notes">${t.chips}</div>
+      <div class="toolhead"><span>Spot grid</span></div>${t.grid}`;
+  }
+  const best = bestOf(b.theirs);
+  return `<div class="screen">
+    <div class="topbar"><button class="iconbtn" data-act="olist">‹</button>
+      <div class="t"><h2>${myTurn ? '<span style="color:var(--hit)">Your turn</span>' : `${opp}'s turn`}</h2><div>Cracking ${opp}'s code · ${myTurn ? `guess #${b.mine.length + 1}` : `${plural(b.mine.length, 'guess')} so far`}</div></div>
+      <button class="iconbtn" data-act="omenu">≡</button><button class="peek" id="peek" style="min-width:84px">My code</button></div>
+    <button class="opp tap" data-act="otab" data-v="theirs" style="width:100%;text-align:left"><span><b style="color:var(--p1)">${opp}</b> has made ${plural(b.theirs.length, 'guess')} on your code</span>${b.theirs.length ? `<span class="muted">best</span>${pegs(best.e, best.n)}` : ''}</button>
+    <div class="play">
+      <div class="left">${hist}${tab === 'mine' ? assistHtml(b) : ''}</div>
+      <div class="controls">${controls}</div>
+    </div></div>`;
+}
+function vOOver(st) {
+  const won = st.winner === st.me, opp = esc(oppName());
+  const mine = st.guesses.filter(x => x.p === st.me).length, theirs = st.guesses.length - mine;
+  const codes = st.me === 0 ? [st.my_code, st.their_code] : [st.their_code, st.my_code];
+  let line;
+  if (st.resigned) line = won ? `${opp} gave up.` : 'You gave up.';
+  else line = won ? `You cracked ${opp}'s code in ${plural(mine, 'guess')}. ${opp} made ${theirs}.` : `${opp} cracked your code in ${plural(theirs, 'guess')}. You made ${mine}.`;
+  return `<div class="screen center scroll">
+    <div class="trophy">${won ? '🏆' : '🔓'}</div>
+    <h1 style="font-size:clamp(26px,7vw,40px)">${won ? '<span style="color:var(--hit)">You win!</span>' : `${opp} wins`}</h1>
+    <p class="muted" style="margin:8px 0 0">${line}</p>
+    ${codesCards(st.names, codes)}
+    <div class="stack">
+      <button class="btn primary" data-act="orematch" ${ui.busy ? 'disabled' : ''}>${st.rematch_id ? 'Go to rematch' : 'Rematch'}</button>
+      <button class="btn" data-act="oreview">Review both boards</button>
+      <button class="btn" data-act="olist">Back to my games</button>
+    </div><div class="err">${esc(ui.oerr)}</div></div>`;
+}
+function vOReview() {
+  const st = ui.og, codes = st.me === 0 ? [st.my_code, st.their_code] : [st.their_code, st.my_code];
+  return reviewScreen(st.names, codes, [st.guesses.filter(x => x.p === 0), st.guesses.filter(x => x.p === 1)], 'oback');
+}
+
+/* online flow */
+async function loadList() {
+  if (!me) return;
+  try {
+    const l = await rpc('cb_games', { p_secret: me.secret });
+    const changed = JSON.stringify(l) !== JSON.stringify(ui.olist);
+    ui.olist = l; if (ui.view === 'online') ui.oerr = '';
+    updateBadge();
+    if (changed && (ui.view === 'online' || ui.view === 'home')) render();
+  } catch (e) { if (ui.view === 'online') { ui.oerr = e.message; render(); } }
+}
+async function loadGame(quiet) {
+  const id = ui.ogId; if (!id || !me) return;
+  try {
+    const st = await rpc('cb_state', { p_secret: me.secret, p_game: id });
+    if (ui.ogId !== id || ui.view !== 'oGame') return;
+    const prev = ui.og;
+    const changed = !prev || prev.id !== st.id || prev.updated_at !== st.updated_at || prev.status !== st.status || prev.guesses.length !== st.guesses.length;
+    ui.og = st; ui.oerr = '';
+    if (!changed) return;
+    if (prev && prev.id === st.id && !quiet) {
+      if (st.status === 'over' && prev.status !== 'over') { if (st.winner === st.me) { sfx.win(); confetti(); } else sfx.lose(); }
+      else if (st.status === 'play' && st.turn === st.me && (prev.turn !== st.me || prev.status !== 'play')) {
+        sfx.turn(); showBanner(prev.status === 'play' ? 'Your turn!' : "Game on — you're first!", 'var(--hit)');
+      } else if (prev.status === 'waiting' && st.status !== 'waiting') { sfx.turn(); showBanner(`${esc(oppName())} joined!`, 'var(--p1)'); }
+    }
+    render();
+  } catch (e) { ui.oerr = e.message; if (!me) ui.view = 'online'; render(); }
+}
+function openGame(id) {
+  ui.view = 'oGame'; ui.ogId = id; ui.og = null; ui.otab = 'mine'; ui.tool = 'keys'; ui.sheet = null; ui.oerr = '';
+  resetEntry(); render(); loadGame(true);
+}
+async function withBusy(fn) {
+  if (ui.busy) return; ui.busy = true; ui.oerr = ''; render();
+  try { await fn(); } catch (e) { ui.oerr = e.message; if (ui.typing || ui.codeMode) { ui.busy = false; flash(e.message); return; } }
+  ui.busy = false; render();
+}
+function oLock() {
+  const code = entryStr(); if (!code) return;
+  const st = ui.og;
+  withBusy(async () => {
+    if (ui.view === 'oGame' && st && st.status === 'codes') {
+      await rpc('cb_set_code', { p_secret: me.secret, p_game: st.id, p_code: code });
+      sfx.lock(); notify(st.id, 'code'); resetEntry(); ui.og = null; ui.busy = false; openGame(st.id); return;
+    }
+    const c = ui.ocode;
+    let id;
+    if (c.mode === 'create') id = (await rpc('cb_create', { p_secret: me.secret, p_repeats: c.repeats, p_code: code })).id;
+    else { id = await rpc('cb_join', { p_secret: me.secret, p_join: c.join, p_code: code }); notify(id, 'join'); }
+    sfx.lock(); resetEntry(); ui.busy = false; openGame(id); loadList();
+  });
+}
+function oGuess() {
+  const g = entryStr(), st = ui.og; if (!g || !st) return;
+  if (st.guesses.some(x => x.p === st.me && x.g === g)) { flash('You already guessed ' + g + '.'); return; }
+  withBusy(async () => {
+    const r = await rpc('cb_guess', { p_secret: me.secret, p_game: st.id, p_guess: g });
+    notify(st.id, 'guess'); resetEntry(); ui.fresh = true; ui.otab = 'mine';
+    if (r.over) { sfx.result(4, 0); setTimeout(sfx.win, 450); setTimeout(confetti, 300); } else sfx.result(r.exact, r.near);
+    ui.busy = false; await loadGame(true); loadList();
+  });
+}
+async function shareInvite() {
+  const jc = ui.og.join_code;
+  const text = `Play Codebreaker with me! Open ${SITE} (on iPhone: Share → Add to Home Screen), tap Play online → Join with a code, and enter: ${jc}`;
+  try { if (navigator.share) { await navigator.share({ title: 'Codebreaker', text }); return; } } catch (e) { if (e.name === 'AbortError') return; }
+  try { await navigator.clipboard.writeText(text); ui.msg = 'Invite copied — paste it into a message.'; }
+  catch (e) { ui.msg = 'Tell them the code: ' + jc; }
+  render(); ui.msg = '';
+}
+
+/* ---------- render ---------- */
+function render() {
+  ui.typing = false; ui.codeMode = false; ui.peekCode = '';
+  let html;
+  switch (ui.view) {
+    case 'home': html = vHome(); break;
+    case 'new': html = vNew(); break;
+    case 'rules': html = vRules(); break;
+    case 'settings': html = vSettings(); break;
+    case 'review': html = vReview(); break;
+    case 'online': html = vOnline(); break;
+    case 'oName': html = vOName(); break;
+    case 'oNew': html = vONew(); break;
+    case 'oJoin': html = vOJoin(); break;
+    case 'oCode': html = vOCode(); break;
+    case 'oGame': html = vOGame(); break;
+    case 'oReview': html = ui.og ? vOReview() : vOGame(); break;
+    default:
+      if (!game) { ui.view = 'home'; html = vHome(); break; }
+      if (game.phase === 'cover') html = vCover();
+      else if (game.phase === 'code') html = vCode();
+      else if (game.phase === 'over' && !game.pending) html = vOver();
+      else html = vPlay();
+  }
+  html += vSheet();
+  // keep whatever the player was typing in a text box across re-renders
+  const f = document.activeElement && document.activeElement.id && document.activeElement.tagName === 'INPUT' ? document.activeElement : null;
+  const keep = f ? { id: f.id, v: f.value, s: f.selectionStart } : null;
+  $app.innerHTML = html;
+  if (keep) { const n = document.getElementById(keep.id); if (n) { n.value = keep.v; n.focus(); try { n.setSelectionRange(keep.s, keep.s); } catch (e) {} } }
+  const h = document.getElementById('hist'); if (h) h.scrollTop = h.scrollHeight;
+  bindPeek();
+}
+function showBanner(text, color) {
+  const b = document.createElement('div'); b.className = 'banner';
+  b.innerHTML = `<div style="color:${color}">${text}</div>`;
+  document.body.appendChild(b); setTimeout(() => b.remove(), 1400);
+}
+function confetti() {
+  const c = document.createElement('div'); c.className = 'confetti';
+  const cols = ['#2ee59d', '#ffb547', '#5cc8ff', '#ff7ac6', '#ffffff'];
+  for (let i = 0; i < 90; i++) {
+    const s = document.createElement('i');
+    s.style.left = Math.random() * 100 + 'vw';
+    s.style.background = cols[i % cols.length];
+    s.style.animationDuration = (1.8 + Math.random() * 1.8) + 's';
+    s.style.animationDelay = Math.random() * 0.6 + 's';
+    s.style.transform = 'rotate(' + Math.random() * 360 + 'deg)';
+    c.appendChild(s);
+  }
+  document.body.appendChild(c); setTimeout(() => c.remove(), 4500);
+}
+function bindPeek() {
+  const b = document.getElementById('peek'); if (!b || !ui.peekCode) return;
+  const code = ui.peekCode;
+  const show = e => { e.preventDefault(); b.textContent = code; b.classList.add('on'); };
+  const hide = () => { b.textContent = 'My code'; b.classList.remove('on'); };
+  b.addEventListener('pointerdown', show);
+  ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => b.addEventListener(ev, hide));
+  b.addEventListener('contextmenu', e => e.preventDefault());
+}
+
+/* ---------- actions ---------- */
+function goOnline() {
+  ui.oerr = ''; ui.view = me ? 'online' : 'oName'; render(); loadList();
+}
+function act(a, d) {
+  switch (a) {
+    case 'home': ui.view = 'home'; ui.sheet = null; ui.oerr = ''; loadList(); break;
+    case 'continue': ui.view = 'game'; resetEntry(); break;
+    case 'new': ui.view = 'new'; ui.first = 0; break;
+    case 'rules': ui.back = ui.view; ui.sheet = null; ui.view = 'rules'; break;
+    case 'settings': ui.back = ui.view; ui.sheet = null; ui.view = 'settings'; break;
+    case 'goback': ui.view = ui.back || 'home'; ui.oerr = ''; if (ui.view === 'oGame') loadGame(true); break;
+    case 'toggleNewRep': saveNames(); settings.repeats = !settings.repeats; saveSettings(); break;
+    case 'first': saveNames(); ui.first = +d.v; break;
+    case 'start': {
+      const n0 = (document.getElementById('n0').value || '').trim() || 'Player 1';
+      let n1 = (document.getElementById('n1').value || '').trim() || 'Player 2';
+      if (n1.toLowerCase() === n0.toLowerCase()) n1 += ' 2';
+      newGame(n0, n1, settings.repeats, ui.first === undefined ? 0 : ui.first); return;
+    }
+    case 'uncover': game.phase = game.cover.then; if (game.phase === 'play') game.turn = game.starter;
+      resetEntry(); saveGame();
+      if (game.phase === 'play') { render(); showBanner(esc(game.names[game.turn]) + "'s turn", pColor(game.turn)); return; }
+      break;
+    case 'key': press(+d.d); return;
+    case 'bksp': backspace(); return;
+    case 'slot': ui.cursor = +d.i; break;
+    case 'go':
+      if (ui.view === 'game') { game.phase === 'code' ? lockCode() : submitGuess(); }
+      else if (ui.view === 'oCode' || (ui.view === 'oGame' && ui.og && ui.og.status === 'codes')) oLock();
+      else if (ui.view === 'oGame') oGuess();
+      return;
+    case 'reveal': ui.reveal = !ui.reveal; break;
+    case 'pass': passTurn(); return;
+    case 'note': { const b = curBoard(); if (!b) return; const n = b.notes.digits; n[+d.d] = (n[+d.d] + 1) % 3; b.save(); buzz(6); break; }
+    case 'cell': { const b = curBoard(); if (!b) return; const g = b.notes.grid; g[+d.i] = (g[+d.i] + 1) % 3; b.save(); buzz(6); break; }
+    case 'clearnotes': { const b = curBoard(); if (!b) return; b.notes.digits.fill(0); b.notes.grid.fill(0); b.save(); break; }
+    case 'tool': ui.tool = d.v; break;
+    case 'menu': ui.sheet = 'menu'; break;
+    case 'closesheet': ui.sheet = null; break;
+    case 'homekeep': ui.sheet = null; ui.view = 'home'; break;
+    case 'quit': ui.sheet = 'confirm'; break;
+    case 'quityes': game = null; saveGame(); ui.sheet = null; ui.view = 'home'; break;
+    case 'rematch': rematch(); return;
+    case 'review': ui.view = 'review'; break;
+    case 'backover': ui.view = 'game'; break;
+    case 'set': settings[d.k] = !settings[d.k]; saveSettings(); break;
+    case 'resetwins': wins = {}; LS.set('cb.wins', wins); break;
+
+    /* online */
+    case 'online': goOnline(); return;
+    case 'oname': ui.back = ui.view; ui.view = 'oName'; ui.oerr = ''; break;
+    case 'osavename': {
+      const n = (document.getElementById('oname').value || '').trim();
+      if (!n) { ui.oerr = 'Type a name first.'; break; }
+      withBusy(async () => {
+        if (me) { await rpc('cb_rename', { p_secret: me.secret, p_name: n }); me.name = n; }
+        else { const r = await rpc('cb_register', { p_name: n }); me = { id: r.id, secret: r.secret, name: n }; }
+        LS.set('cb.me', me); ui.view = ui.joinPrefill ? 'oJoin' : 'online'; ui.olist = null; loadList(); refreshPush();
+      });
+      return;
+    }
+    case 'opush': enablePush(); return;
+    case 'onew': ui.view = 'oNew'; ui.oerr = ''; break;
+    case 'onewgo': ui.ocode = { mode: 'create', repeats: settings.repeats }; resetEntry(); ui.view = 'oCode'; break;
+    case 'ojoin': ui.view = 'oJoin'; ui.oerr = ''; break;
+    case 'ojoingo': {
+      const jc = (document.getElementById('ojoin').value || '').trim().toUpperCase();
+      ui.joinPrefill = jc;
+      if (jc.length !== 5) { ui.oerr = 'Join codes are 5 characters.'; break; }
+      withBusy(async () => {
+        const r = await rpc('cb_lookup', { p_secret: me.secret, p_join: jc });
+        ui.joinPrefill = '';
+        if (r.joined) { ui.busy = false; openGame(r.id); return; }
+        ui.ocode = { mode: 'join', join: jc, host: r.host, repeats: r.repeats }; resetEntry(); ui.view = 'oCode';
+      });
+      return;
+    }
+    case 'oopen': openGame(d.id); return;
+    case 'olist': ui.sheet = null; ui.view = 'online'; ui.ogId = null; ui.og = null; ui.oerr = ''; render(); loadList(); return;
+    case 'oback': ui.view = 'oGame'; break;
+    case 'otab': ui.otab = d.v; break;
+    case 'omenu': ui.sheet = 'omenu'; break;
+    case 'oresign': ui.sheet = 'oresign'; break;
+    case 'oresignyes': {
+      const id = ui.og.id; ui.sheet = null;
+      withBusy(async () => { await rpc('cb_resign', { p_secret: me.secret, p_game: id }); notify(id, 'resign'); ui.busy = false; await loadGame(true); });
+      return;
+    }
+    case 'ocancel': {
+      const id = ui.og.id;
+      withBusy(async () => { await rpc('cb_hide', { p_secret: me.secret, p_game: id }); ui.busy = false; act('olist', {}); });
+      return;
+    }
+    case 'oshare': shareInvite(); return;
+    case 'oreview': ui.view = 'oReview'; break;
+    case 'orematch': {
+      const st = ui.og;
+      if (st.rematch_id) { openGame(st.rematch_id); return; }
+      withBusy(async () => { const id = await rpc('cb_rematch', { p_secret: me.secret, p_game: st.id }); notify(id, 'rematch'); ui.busy = false; openGame(id); });
+      return;
+    }
+    default: return;
+  }
+  render();
+}
+function saveNames() {
+  const a = document.getElementById('n0'), b = document.getElementById('n1');
+  if (a && b) { names = [a.value, b.value]; }
+}
+$app.addEventListener('click', e => {
+  const t = e.target.closest('[data-act]');
+  if (!t) return;
+  // taps inside a sheet should not trigger the veil's close
+  if (t.classList.contains('veil') && e.target.closest('[data-stop]')) return;
+  act(t.dataset.act, t.dataset);
+});
+// physical keyboard support (handy on a desktop / with a keyboard cover)
+document.addEventListener('keydown', e => {
+  if (e.target && e.target.tagName === 'INPUT') {
+    if (e.key === 'Enter') { if (e.target.id === 'oname') act('osavename', {}); if (e.target.id === 'ojoin') act('ojoingo', {}); }
+    return;
+  }
+  if (!ui.typing || ui.sheet) return;
+  if (/^[0-9]$/.test(e.key)) press(+e.key);
+  else if (e.key === 'Backspace') backspace();
+  else if (e.key === 'Enter') act('go', {});
+});
+
+/* Android back button: return true if handled inside the game */
+window.cbBack = function () {
+  if (ui.sheet) { ui.sheet = null; render(); return true; }
+  switch (ui.view) {
+    case 'rules': case 'settings': case 'oName': act(me || ui.view !== 'oName' ? 'goback' : 'home', {}); return true;
+    case 'new': act('home', {}); return true;
+    case 'review': act('backover', {}); return true;
+    case 'online': act('home', {}); return true;
+    case 'oNew': case 'oJoin': case 'oCode': case 'oGame': act('olist', {}); return true;
+    case 'oReview': act('oback', {}); return true;
+    case 'game':
+      if (game && (game.phase === 'play' || game.phase === 'code')) { ui.sheet = 'menu'; render(); return true; }
+      act('home', {}); return true;
+  }
+  return false;
+};
+
+/* ---------- background refresh ---------- */
+function tick() {
+  if (document.hidden || !me) return;
+  if (ui.view === 'oGame' && !ui.busy) loadGame();
+  else if (ui.view === 'online' || ui.view === 'home') loadList();
+}
+setInterval(tick, 3000);
+document.addEventListener('visibilitychange', tick);
+async function refreshPush() {
+  // quietly keep this phone's alert subscription registered
+  if (!me || !pushSupported() || Notification.permission !== 'granted') return;
+  try { await subscribePush(); if (ui.view === 'online') render(); } catch (e) {}
+}
+if ('serviceWorker' in navigator && location.protocol === 'https:') {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+  navigator.serviceWorker.addEventListener('message', e => {
+    const m = e.data || {};
+    if (m.open && me) openGame(m.open); else tick();
+  });
+}
+
+/* ---------- start ---------- */
+(function start() {
+  const h = location.hash;
+  const g = /#g=([0-9a-f-]{36})/.exec(h), j = /#join=([A-Za-z0-9]{5})/.exec(h);
+  if (h) try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
+  if (g && me) { openGame(g[1]); }
+  else if (j) { ui.joinPrefill = j[1].toUpperCase(); ui.view = me ? 'oJoin' : 'oName'; render(); }
+  else render();
+  loadList(); refreshPush();
+})();
+</script>
+</body>
+</html>
