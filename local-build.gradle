@@ -1,0 +1,4 @@
+// Keep build output out of Documents (iCloud sync created duplicate class files for Daybreak)
+allprojects {
+    layout.buildDirectory.set(file('/private/tmp/codebreaker-build/' + (project == rootProject ? 'root' : project.name)))
+}
