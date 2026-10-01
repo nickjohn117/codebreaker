@@ -125,6 +125,29 @@ h1,h2,h3{margin:0}
 .row.win{background:rgba(46,229,157,.12);outline:1px solid var(--hit)}
 .row.new{animation:slidein .3s both}
 @keyframes slidein{from{opacity:0;transform:translateY(8px)}}
+.wideflex{display:none}
+.row .d span.hd{cursor:pointer}
+.row .d span.s1{opacity:.35;text-decoration:line-through;color:var(--danger)}
+.row .d span.s2{color:var(--hit);box-shadow:inset 0 0 0 2px var(--hit)}
+.tip{font-size:12px;color:var(--muted);text-align:center;padding-top:8px}
+.npane{gap:8px;margin-top:8px}
+.minis{display:flex;flex-wrap:wrap;gap:6px;flex:none}
+.mg{display:flex;align-items:center;gap:7px;background:var(--panel2);border-radius:9px;padding:5px 8px;font:700 15px var(--mono);letter-spacing:.06em}
+.mg i{font-style:normal}
+.mg i.s1{opacity:.35;text-decoration:line-through;color:var(--danger)}
+.mg i.s2{color:var(--hit)}
+.mg .pegs{--pg:8px;gap:2px}
+.ntable{display:grid;grid-template-columns:62px repeat(4,1fr);gap:5px;align-items:center;flex:none}
+.ntable .lab{font-size:11px;color:var(--muted);text-align:center;text-transform:uppercase;letter-spacing:.05em}
+.nd{height:34px;border-radius:9px;background:var(--panel2);border:1px solid var(--line);font:700 18px var(--mono);display:flex;align-items:center;justify-content:center;gap:5px}
+.nd small{font-size:13px}
+.nd.s1{color:var(--danger);opacity:.6}
+.nd.s2{color:var(--hit);border-color:var(--hit);background:rgba(46,229,157,.14)}
+.ntable .cell{height:34px;font-size:16px}
+.ntable .cell.dim{opacity:.3}
+.backbar{min-height:48px;margin-top:2px}
+.nfoot{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:12px;color:var(--muted);line-height:1.4;flex:none;padding-bottom:4px}
+.nfoot button{color:var(--accent);font-size:12px;text-transform:uppercase;letter-spacing:.06em;flex:none}
 .empty{margin:auto;text-align:center;color:var(--muted);font-size:14px;padding:20px;line-height:1.5}
 .assist{font-size:13px;color:var(--near);text-align:center;margin-top:8px}
 .controls{flex:none;padding-top:12px}
@@ -142,7 +165,8 @@ h1,h2,h3{margin:0}
   .play .controls{padding-top:0;overflow-y:auto;min-height:0}
   .row .d span{width:44px;height:50px;font-size:26px}
   .row{--pg:18px;padding:9px 14px}
-  .narrowonly{display:none}
+  .narrowonly{display:none !important}
+  .wideflex{display:flex}
   .wideonly{display:block}
 }
 @media (max-height:700px) and (max-width:719px){
@@ -339,7 +363,7 @@ function newGame(n0, n1, repeats, first) {
   const starter = first === 2 ? (Math.random() < 0.5 ? 0 : 1) : first;
   game = { v: 1, names: [n0, n1], repeats, starter, turn: starter, phase: 'cover', cover: { p: 0, then: 'code' },
     codes: ['', ''], guesses: [[], []], notes: [mkNotes(), mkNotes()], winner: null, pending: null };
-  saveGame(); resetEntry(); ui.view = 'game'; render();
+  saveGame(); resetEntry(); ui.otab = 'mine'; ui.view = 'game'; render();
 }
 function rematch() {
   // the player who lost gets to go first next time
@@ -374,7 +398,7 @@ function submitGuess() {
   saveGame(); render();
 }
 function passTurn() {
-  game.pending = null; ui.tool = 'keys';
+  game.pending = null; ui.tool = 'keys'; ui.otab = 'mine';
   if (game.phase === 'over') { saveGame(); ui.view = 'game'; render(); confetti(); return; }
   game.turn = other(game.turn); saveGame(); render();
   showBanner(esc(game.names[game.turn]) + "'s turn", pColor(game.turn));
@@ -446,17 +470,41 @@ function codeEntry(o) {
       ${keypad('Lock in', !!entryStr(), null)}
     </div></div>`;
 }
-function historyHtml(list, freshLast, emptyNote, tabs) {
+function historyHtml(list, freshLast, emptyNote, tabs, o) {
+  // o.notes: make digits tappable (cross out / confirm); o.pane: notes tab content (narrow screens)
+  o = o || {};
+  const nd = o.notes ? o.notes.digits : null;
   const rows = list.map((x, i) => {
     const isNew = freshLast && i === list.length - 1;
+    const digits = x.g.split('').map(c => nd ? `<span class="hd s${nd[+c]}" data-act="note" data-d="${c}">${c}</span>` : `<span>${c}</span>`).join('');
     return `<div class="row ${x.e === 4 ? 'win' : ''} ${isNew ? 'new' : ''}">
-      <span class="n">${i + 1}</span><div class="d">${x.g.split('').map(c => `<span>${c}</span>`).join('')}</div>
+      <span class="n">${i + 1}</span><div class="d">${digits}</div>
       ${x.e + x.n === 0 ? '<span class="zero">none</span>' : ''}${pegs(x.e, x.n)}</div>`;
   }).join('');
+  const tip = nd && list.length && nd.every(v => !v) ? `<div class="tip ${o.pane ? 'wideonly' : ''}">Tip: tap a digit to cross it out ✕ or mark it ✓</div>` : '';
   return `<div class="histwrap">
-    <div class="legend"><span><i class="hit"></i>right number, right spot</span><span><i class="near"></i>right number, wrong spot</span></div>
+    <div class="legend"><span><i class="hit"></i>right spot</span><span><i class="near"></i>wrong spot</span></div>
     ${tabs || ''}
-    <div class="history" id="hist">${rows || `<div class="empty">No guesses yet.${emptyNote ? '<br>' + emptyNote : ''}</div>`}</div></div>`;
+    <div class="history ${o.pane ? 'wideflex' : ''}" id="hist">${rows || `<div class="empty">No guesses yet.${emptyNote ? '<br>' + emptyNote : ''}</div>`}</div>
+    ${o.pane ? `<div class="history npane narrowonly">${o.pane}</div>` : ''}${tip}</div>`;
+}
+function notesPane(b) {
+  const nt = b.notes, mark = v => v === 1 ? '✕' : v === 2 ? '✓' : '';
+  const minis = b.mine.length
+    ? b.mine.map(x => `<span class="mg">${x.g.split('').map(c => `<i class="s${nt.digits[+c]}">${c}</i>`).join('')}${pegs(x.e, x.n)}</span>`).join('')
+    : '<span class="muted" style="font-size:13px">No guesses yet</span>';
+  let rows = '';
+  for (let d = 0; d < 10; d++) {
+    const ds = nt.digits[d];
+    rows += `<button class="nd s${ds}" data-act="note" data-d="${d}">${d}<small>${mark(ds)}</small></button>`;
+    for (let pos = 0; pos < 4; pos++) {
+      const v = nt.grid[pos * 10 + d];
+      rows += `<button class="cell s${v} ${ds === 1 ? 'dim' : ''}" data-act="cell" data-i="${pos * 10 + d}">${mark(v)}</button>`;
+    }
+  }
+  return `<div class="minis">${minis}</div>
+    <div class="ntable"><span class="lab">number</span><span class="lab">spot 1</span><span class="lab">spot 2</span><span class="lab">spot 3</span><span class="lab">spot 4</span>${rows}</div>
+    <div class="nfoot"><span>Tap to cycle: ✕ = no · ✓ = yes · blank</span><button data-act="clearnotes">Clear all</button></div>`;
 }
 function toolsHtml(nt) {
   const chips = nt.digits.map((s, d) => `<button class="chip s${s}" data-act="note" data-d="${d}">${d}</button>`).join('');
@@ -474,15 +522,18 @@ const notesHead = `<div class="toolhead"><span>Digit notes · tap to ✕ or ✓<
 function guessControls(b) {
   const t = toolsHtml(b.notes), entry = entryStr();
   const warn = settings.assist && entry && !consistent(entry, b.mine, b.repeats) ? `Heads up: ${entry} can't be the code based on your clues.` : '';
-  const grid = ui.tool === 'grid';
-  // narrow screens switch between keypad and grid; wide screens (unfolded) show both
-  return `${slotsHtml(false, warn)}
-    ${notesHead}<div class="notes">${t.chips}</div>
-    <div class="seg narrowonly">
-      <button data-act="tool" data-v="keys" class="${grid ? '' : 'on'}">Keypad</button>
-      <button data-act="tool" data-v="grid" class="${grid ? 'on' : ''}">Spot grid</button></div>
-    <div class="${grid ? 'wideonly' : ''}">${keypad('Guess', !!entry, b.notes)}</div>
-    <div class="${grid ? '' : 'wideonly'}"><div class="toolhead wideonly"><span>Spot grid — which digit could go where</span></div>${t.grid}</div>`;
+  // narrow screens: notes live in the Notes tab above; wide screens (unfolded) also show them here
+  // while the Notes tab is open on a narrow screen, the keypad steps aside so the whole notes table fits
+  const noting = ui.otab === 'notes';
+  return `<div class="${noting ? 'wideonly' : ''}">${slotsHtml(false, warn)}
+    <div class="wideonly">${notesHead}<div class="notes">${t.chips}</div></div>
+    ${keypad('Guess', !!entry, b.notes)}</div>
+    ${noting ? backToGuess() : ''}
+    <div class="wideonly"><div class="toolhead"><span>Spot grid — which digit could go where</span></div>${t.grid}</div>`;
+}
+function backToGuess() {
+  const typed = ui.entry.some(d => d !== null) ? ui.entry.map(d => d === null ? '_' : d).join('') : '';
+  return `<button class="btn primary narrowonly backbar" data-act="otab" data-v="mine">⌨ Back to my guess${typed ? ` <span class="mono">${typed}</span>` : ''}</button>`;
 }
 function assistHtml(b) {
   if (!settings.assist) return '';
@@ -577,9 +628,16 @@ function vPlay() {
       <button class="peek" id="peek">My code</button></div>
     <div class="opp"><span><b style="color:${pColor(o)}">${on}</b> has made ${plural(b.theirs.length, 'guess')} on your code</span>${b.theirs.length ? `<span class="muted">best</span>${pegs(best.e, best.n)}` : ''}</div>
     <div class="play">
-      <div class="left">${historyHtml(b.mine, fresh, 'Enter 4 digits below and tap Guess.')}${assistHtml(b)}</div>
+      <div class="left">${localHistory(b, fresh)}${assistHtml(b)}</div>
       <div class="controls">${controls}</div>
     </div></div>`;
+}
+function localHistory(b, fresh) {
+  const notes = ui.otab === 'notes' && !game.pending;
+  const tabs = game.pending ? '' : `<div class="minitabs narrowonly">
+    <button data-act="otab" data-v="mine" class="${notes ? '' : 'on'}">My guesses (${b.mine.length})</button>
+    <button data-act="otab" data-v="notes" class="${notes ? 'on' : ''}">📝 Notes</button></div>`;
+  return historyHtml(b.mine, fresh, 'Enter 4 digits below and tap Guess.', tabs, { notes: b.notes, pane: notes ? notesPane(b) : '' });
 }
 function vOver() {
   const w = game.winner, l = other(w);
@@ -851,21 +909,26 @@ function vOPlay(st, top) {
   ui.peekCode = b.myCode;
   const tab = ui.otab;
   const tabs = `<div class="minitabs">
-    <button data-act="otab" data-v="mine" class="${tab === 'mine' ? 'on' : ''}">My guesses (${b.mine.length})</button>
-    <button data-act="otab" data-v="theirs" class="${tab === 'theirs' ? 'on' : ''}">${opp}'s guesses (${b.theirs.length})</button></div>`;
-  const list = tab === 'mine' ? b.mine : b.theirs;
-  const hist = historyHtml(list, fresh && tab === 'mine', tab === 'mine' ? (myTurn ? 'Enter 4 digits and tap Guess.' : '') : `This is how close ${opp} is to your code <b class="mono">${esc(b.myCode)}</b>.`, tabs);
+    <button data-act="otab" data-v="mine" class="${tab !== 'theirs' && tab !== 'notes' ? 'on' : ''}">Mine (${b.mine.length})</button>
+    <button data-act="otab" data-v="theirs" class="${tab === 'theirs' ? 'on' : ''}">${opp}'s (${b.theirs.length})</button>
+    <button data-act="otab" data-v="notes" class="narrowonly ${tab === 'notes' ? 'on' : ''}">📝 Notes</button></div>`;
+  const theirs = tab === 'theirs';
+  const hist = theirs
+    ? historyHtml(b.theirs, false, `This is how close ${opp} is to your code <b class="mono">${esc(b.myCode)}</b>.`, tabs)
+    : historyHtml(b.mine, fresh, myTurn ? 'Enter 4 digits and tap Guess.' : '', tabs, { notes: b.notes, pane: tab === 'notes' ? notesPane(b) : '' });
   let controls;
   if (myTurn) controls = guessControls(b);
   else {
     const last = b.mine[b.mine.length - 1], t = toolsHtml(b.notes);
-    controls = `<div class="result">
+    const noting = tab === 'notes';
+    controls = `${noting ? `<button class="btn narrowonly backbar" data-act="otab" data-v="mine">Back to my guesses</button>` : ''}<div class="result ${noting ? 'wideonly' : ''}">
         ${last ? `<div class="muted" style="font-size:14px">Your guess <b class="mono" style="color:var(--text)">${last.g}</b></div>
           <div class="big" style="margin-bottom:4px"><div><strong style="color:var(--hit)">${last.e}</strong>right spot</div><div><strong style="color:var(--near)">${last.n}</strong>wrong spot</div></div>` : ''}
         <div class="waiting"><span class="spin"></span>${opp}'s turn to guess…</div>
         <div class="muted" style="font-size:13px">${ui.pushOk ? "We'll buzz you when it's your move." : "You can leave — your game is saved."}</div></div>
-      ${notesHead}<div class="notes">${t.chips}</div>
-      <div class="toolhead"><span>Spot grid</span></div>${t.grid}`;
+      <div class="wideonly">${notesHead}<div class="notes">${t.chips}</div>
+      <div class="toolhead"><span>Spot grid</span></div>${t.grid}</div>
+      ${tab === 'notes' ? '' : `<button class="btn narrowonly" data-act="otab" data-v="notes" style="margin-top:10px;min-height:46px">📝 Work on my notes</button>`}`;
   }
   const best = bestOf(b.theirs);
   return `<div class="screen">
@@ -874,7 +937,7 @@ function vOPlay(st, top) {
       <button class="iconbtn" data-act="omenu">≡</button><button class="peek" id="peek" style="min-width:84px">My code</button></div>
     <button class="opp tap" data-act="otab" data-v="theirs" style="width:100%;text-align:left"><span><b style="color:var(--p1)">${opp}</b> has made ${plural(b.theirs.length, 'guess')} on your code</span>${b.theirs.length ? `<span class="muted">best</span>${pegs(best.e, best.n)}` : ''}</button>
     <div class="play">
-      <div class="left">${hist}${tab === 'mine' ? assistHtml(b) : ''}</div>
+      <div class="left">${hist}${theirs ? '' : assistHtml(b)}</div>
       <div class="controls">${controls}</div>
     </div></div>`;
 }
