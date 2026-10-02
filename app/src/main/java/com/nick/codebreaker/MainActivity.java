@@ -8,6 +8,8 @@ import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
 import android.view.WindowInsets;
+import android.view.WindowInsetsController;
+import android.webkit.JavascriptInterface;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -16,16 +18,35 @@ import android.widget.FrameLayout;
 /** Hosts the game, which is a single offline HTML page bundled in assets/www. */
 public class MainActivity extends Activity {
     private WebView web;
+    private FrameLayout root;
+
+    /** Lets the game match the phone's status and navigation bars to its light/dark theme. */
+    private class Bridge {
+        @JavascriptInterface
+        public void setTheme(String theme) { runOnUiThread(() -> applyBars("light".equals(theme))); }
+    }
+
+    private void applyBars(boolean light) {
+        int bg = light ? Color.parseColor("#F2EEE5") : Color.parseColor("#060A11");
+        root.setBackgroundColor(bg);
+        web.setBackgroundColor(bg);
+        getWindow().setStatusBarColor(bg);
+        getWindow().setNavigationBarColor(bg);
+        if (Build.VERSION.SDK_INT >= 30 && getWindow().getInsetsController() != null) {
+            int mask = WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS | WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS;
+            getWindow().getInsetsController().setSystemBarsAppearance(light ? mask : 0, mask);
+        }
+    }
 
     @SuppressLint("SetJavaScriptEnabled")
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
-        FrameLayout root = new FrameLayout(this);
-        root.setBackgroundColor(Color.parseColor("#0A0E14"));
+        root = new FrameLayout(this);
+        root.setBackgroundColor(Color.parseColor("#060A11"));
 
         web = new WebView(this);
-        web.setBackgroundColor(Color.parseColor("#0A0E14"));
+        web.setBackgroundColor(Color.parseColor("#060A11"));
         web.setOverScrollMode(View.OVER_SCROLL_NEVER);
         // no text-selection popups when holding "My code"
         web.setLongClickable(false);
@@ -40,6 +61,7 @@ public class MainActivity extends Activity {
         s.setTextZoom(100);
         s.setMediaPlaybackRequiresUserGesture(false);
 
+        web.addJavascriptInterface(new Bridge(), "Android");
         root.addView(web, new FrameLayout.LayoutParams(-1, -1));
         setContentView(root);
 

@@ -13,63 +13,122 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" href="icon-192.png">
 <style>
+@font-face{font-family:"Space Grotesk";font-weight:600;font-display:swap;src:url(fonts/space-grotesk-latin-600-normal.woff2) format("woff2")}
+@font-face{font-family:"Space Grotesk";font-weight:700;font-display:swap;src:url(fonts/space-grotesk-latin-700-normal.woff2) format("woff2")}
+@font-face{font-family:"JetBrains Mono";font-weight:700;font-display:swap;src:url(fonts/jetbrains-mono-latin-700-normal.woff2) format("woff2")}
+@font-face{font-family:"JetBrains Mono";font-weight:800;font-display:swap;src:url(fonts/jetbrains-mono-latin-800-normal.woff2) format("woff2")}
+
+/* ---------- theme tokens: "vault" (dark) and "dossier" (light) ---------- */
 :root{
-  --bg:#0a0e14; --panel:#111823; --panel2:#172130; --line:#233142; --text:#e8eef5; --muted:#8a9bb1;
-  --hit:#2ee59d; --near:#ffb547; --accent:#5cc8ff; --danger:#ff5c7a;
-  --p0:#5cc8ff; --p1:#ff7ac6;
-  --mono:ui-monospace,"Roboto Mono","Droid Sans Mono",Menlo,monospace;
+  --bg:#060a11; --bg-glow:rgba(56,140,220,.16); --grid-line:rgba(110,170,240,.045);
+  --panel:rgba(18,27,42,.78); --panel2:rgba(28,40,60,.72); --solid:#0f1724; --raise:#172234;
+  --line:rgba(140,175,220,.13); --line2:rgba(140,175,220,.24); --hl:rgba(255,255,255,.06);
+  --text:#ecf2fb; --muted:#8c9bb2; --faint:#5c6a80;
+  --hit:#34e3a0; --hit-deep:#0f9e68; --near:#ffb84d; --accent:#5ec8ff; --accent-deep:#2f9fe0; --danger:#ff6383;
+  --p0:#5ec8ff; --p1:#ff7ac6;
+  --on-accent:#031420; --on-hit:#02170e;
+  --tile:#0a111c; --tile-shadow:inset 0 2px 8px rgba(0,0,0,.45);
+  --key:linear-gradient(180deg,#1b283b 0%,#141f30 100%); --key-edge:rgba(0,0,0,.45);
+  --peg-empty:rgba(140,175,220,.12);
+  --shadow:0 18px 40px rgba(0,0,0,.42); --shadow-sm:0 6px 18px rgba(0,0,0,.28);
+  --veil:rgba(2,6,12,.66);
+  --display:"Space Grotesk",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,"Roboto Mono",monospace;
+  color-scheme:dark;
 }
+:root[data-theme="light"]{
+  --bg:#f2eee5; --bg-glow:rgba(255,255,255,.85); --grid-line:rgba(70,55,30,.055);
+  --panel:rgba(255,255,255,.86); --panel2:rgba(246,242,233,.95); --solid:#fffdf8; --raise:#ffffff;
+  --line:rgba(60,48,25,.12); --line2:rgba(60,48,25,.22); --hl:rgba(255,255,255,.9);
+  --text:#18202d; --muted:#666e7c; --faint:#9aa0aa;
+  --hit:#0ea36b; --hit-deep:#08804f; --near:#d98a0b; --accent:#1f6fd1; --accent-deep:#1659ad; --danger:#d63a5c;
+  --p0:#1f6fd1; --p1:#c2378a;
+  --on-accent:#ffffff; --on-hit:#ffffff;
+  --tile:#efe9dc; --tile-shadow:inset 0 2px 5px rgba(80,60,20,.12);
+  --key:linear-gradient(180deg,#ffffff 0%,#f5f1e8 100%); --key-edge:rgba(80,60,20,.16);
+  --peg-empty:rgba(60,48,25,.1);
+  --shadow:0 18px 40px rgba(80,60,20,.14); --shadow-sm:0 6px 16px rgba(80,60,20,.1);
+  --veil:rgba(40,32,18,.35);
+  color-scheme:light;
+}
+
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
+html,body{margin:0;height:100%;color:var(--text);
   font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overscroll-behavior:none;
-  -webkit-user-select:none;user-select:none;overflow:hidden}
+  -webkit-user-select:none;user-select:none;overflow:hidden;-webkit-font-smoothing:antialiased}
+html{background:var(--bg)}
+body{touch-action:manipulation;
+  background:
+    radial-gradient(120% 70% at 50% -10%,var(--bg-glow),transparent 60%),
+    linear-gradient(var(--grid-line) 1px,transparent 1px) 0 0/28px 28px,
+    linear-gradient(90deg,var(--grid-line) 1px,transparent 1px) 0 0/28px 28px,
+    var(--bg)}
 button{font:inherit;color:inherit;border:0;background:none;cursor:pointer;touch-action:manipulation}
 input{font:inherit}
-body{touch-action:manipulation}
+.ic{display:block;flex:none}
 #app{height:100%;display:flex;flex-direction:column;
   padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
 .screen{flex:1;min-height:0;display:flex;flex-direction:column;width:100%;max-width:1100px;margin:0 auto;padding:14px 16px}
+.screen.enter{animation:enter .28s cubic-bezier(.2,.8,.2,1) both}
+@keyframes enter{from{opacity:0;transform:translateY(10px)}}
 .scroll{overflow-y:auto;-webkit-overflow-scrolling:touch}
 .center{align-items:center;justify-content:center;justify-content:safe center;text-align:center}
-h1,h2,h3{margin:0}
+h1,h2,h3{margin:0;font-family:var(--display);font-weight:700;letter-spacing:-.01em}
 .muted{color:var(--muted)}
 .mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
 .p0{color:var(--p0)} .p1{color:var(--p1)}
 
-/* buttons */
-.btn{display:flex;align-items:center;justify-content:center;gap:8px;min-height:54px;padding:0 20px;border-radius:14px;
-  background:var(--panel2);border:1px solid var(--line);font-weight:650;font-size:17px;width:100%}
-.btn:active{transform:scale(.98)}
-.btn.primary{background:var(--accent);color:#04121d;border-color:transparent}
-.btn.hit{background:var(--hit);color:#03170e;border-color:transparent}
+/* ---------- surfaces ---------- */
+.glass{background:var(--panel);border:1px solid var(--line);box-shadow:inset 0 1px 0 var(--hl),var(--shadow-sm);
+  -webkit-backdrop-filter:blur(16px) saturate(140%);backdrop-filter:blur(16px) saturate(140%)}
+
+/* ---------- buttons ---------- */
+.btn{display:flex;align-items:center;justify-content:center;gap:10px;min-height:54px;padding:0 20px;border-radius:16px;
+  background:var(--panel2);border:1px solid var(--line);box-shadow:inset 0 1px 0 var(--hl);
+  font:600 16.5px var(--display);letter-spacing:.005em;width:100%;transition:transform .12s,box-shadow .2s,filter .2s}
+.btn:active{transform:scale(.975)}
+.btn.primary{background:linear-gradient(180deg,var(--accent) 0%,var(--accent-deep) 100%);color:var(--on-accent);border-color:transparent;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.28),0 10px 24px color-mix(in srgb,var(--accent) 30%,transparent)}
+.btn.hit{background:linear-gradient(180deg,var(--hit) 0%,var(--hit-deep) 100%);color:var(--on-hit);border-color:transparent;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.28),0 10px 24px color-mix(in srgb,var(--hit) 28%,transparent)}
 .btn.danger{color:var(--danger)}
-.btn[disabled]{opacity:.35;pointer-events:none}
+.btn[disabled]{opacity:.38;pointer-events:none;box-shadow:none}
 .stack{display:flex;flex-direction:column;gap:12px;width:100%;max-width:420px}
-.iconbtn{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;background:var(--panel);border:1px solid var(--line);font-size:20px}
+.iconbtn{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;background:var(--panel2);border:1px solid var(--line);
+  box-shadow:inset 0 1px 0 var(--hl);color:var(--text);flex:none;transition:transform .12s}
+.iconbtn:active{transform:scale(.94)}
+.linkbtn{color:var(--accent);font-weight:600}
 
-/* logo */
-.logo{font-weight:800;letter-spacing:.18em;font-size:clamp(30px,8vw,48px)}
-.logo span{color:var(--hit)}
-.logopegs{display:grid;grid-template-columns:repeat(2,26px);gap:10px;margin:0 auto 22px}
-.tag{margin:10px 0 30px;font-size:16px}
+/* ---------- logo ---------- */
+.logo{font:700 clamp(32px,9vw,52px)/1 var(--display);letter-spacing:.14em;margin-top:4px}
+.logo span{color:var(--hit);text-shadow:0 0 24px color-mix(in srgb,var(--hit) 45%,transparent)}
+.logopegs{display:grid;grid-template-columns:repeat(2,26px);gap:10px;margin:0 auto 20px;--pg:26px}
+.logopegs .peg{animation:logopulse 3.2s ease-in-out infinite}
+.logopegs .peg:nth-child(2){animation-delay:.4s}.logopegs .peg:nth-child(3){animation-delay:.8s}.logopegs .peg:nth-child(4){animation-delay:1.2s}
+@keyframes logopulse{0%,70%,100%{transform:scale(1)}80%{transform:scale(1.14)}}
+.tag{margin:12px 0 26px;font-size:15.5px;color:var(--muted)}
 
-/* pegs */
+/* ---------- pegs ---------- */
 .pegs{display:grid;grid-template-columns:repeat(2,var(--pg,15px));gap:5px;flex:none}
-.peg{width:var(--pg,15px);height:var(--pg,15px);border-radius:50%;background:#1d2835}
-.peg.hit{background:var(--hit);box-shadow:0 0 10px rgba(46,229,157,.55)}
-.peg.near{background:transparent;border:3.5px solid var(--near);box-shadow:0 0 8px rgba(255,181,71,.35)}
-.new .peg{animation:pop .4s both}
-@keyframes pop{0%{transform:scale(0)}70%{transform:scale(1.3)}100%{transform:scale(1)}}
-.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:13px;color:var(--muted);align-items:center}
-.legend i{display:inline-block;width:13px;height:13px;border-radius:50%;vertical-align:-2px;margin-right:6px}
+.peg{width:var(--pg,15px);height:var(--pg,15px);border-radius:50%;background:var(--peg-empty);box-shadow:inset 0 1px 2px rgba(0,0,0,.25)}
+.peg.hit{background:radial-gradient(circle at 34% 30%,#d6fff0 0%,var(--hit) 46%,var(--hit-deep) 100%);
+  box-shadow:0 0 12px color-mix(in srgb,var(--hit) 55%,transparent)}
+.peg.near{background:radial-gradient(circle,transparent 46%,var(--near) 50%,color-mix(in srgb,var(--near) 80%,#000) 100%);
+  box-shadow:0 0 10px color-mix(in srgb,var(--near) 40%,transparent)}
+.new .peg{animation:pop .42s cubic-bezier(.3,1.6,.5,1) both}
+@keyframes pop{0%{transform:scale(0)}100%{transform:scale(1)}}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12.5px;color:var(--muted);align-items:center}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:50%;vertical-align:-2px;margin-right:6px}
 .legend i.hit{background:var(--hit)} .legend i.near{border:3px solid var(--near)}
 
-/* tiles / input */
+/* ---------- code tiles ---------- */
 .slots{display:flex;gap:10px;justify-content:center}
-.tile{width:clamp(52px,15vw,70px);height:clamp(60px,17vw,80px);border-radius:14px;background:var(--panel2);border:2px solid var(--line);
-  display:grid;place-items:center;font:700 clamp(28px,8vw,40px)/1 var(--mono)}
-.tile.cur{border-color:var(--accent);box-shadow:0 0 0 4px rgba(92,200,255,.18)}
-.tile.cur:empty::after{content:"";width:3px;height:45%;background:var(--accent);animation:blink 1s steps(1) infinite}
+.tile{width:clamp(52px,15vw,70px);height:clamp(60px,17vw,80px);border-radius:16px;background:var(--tile);border:1.5px solid var(--line2);
+  box-shadow:var(--tile-shadow);display:grid;place-items:center;font:800 clamp(28px,8vw,40px)/1 var(--mono);transition:border-color .15s,box-shadow .15s}
+.tile.cur{border-color:var(--accent);box-shadow:var(--tile-shadow),0 0 0 4px color-mix(in srgb,var(--accent) 20%,transparent)}
+.tile.cur:empty::after{content:"";width:3px;height:44%;border-radius:2px;background:var(--accent);animation:blink 1s steps(1) infinite}
+.tile:not(:empty){animation:tilein .18s ease-out}
+@keyframes tilein{from{transform:scale(.88)}}
 @keyframes blink{50%{opacity:0}}
 .tile.dot{font-size:20px}
 .msg{min-height:22px;text-align:center;font-size:14px;margin:8px 0 4px;color:var(--danger)}
@@ -77,87 +136,98 @@ h1,h2,h3{margin:0}
 .shake{animation:shake .35s}
 @keyframes shake{25%{transform:translateX(-8px)}50%{transform:translateX(8px)}75%{transform:translateX(-4px)}}
 
-/* keypad */
+/* ---------- keypad ---------- */
 .keys{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
-.key{height:clamp(44px,6.2vh,64px);border-radius:14px;background:var(--panel2);border:1px solid var(--line);
-  font:600 26px var(--mono);position:relative}
-.key:active{transform:scale(.95);background:#22324a}
+.key{height:clamp(44px,6.2vh,64px);border-radius:16px;background:var(--key);border:1px solid var(--line);
+  box-shadow:inset 0 1px 0 var(--hl),0 2px 0 var(--key-edge);font:700 25px var(--mono);position:relative;
+  display:grid;place-items:center;transition:transform .08s,box-shadow .08s}
+.key:active{transform:translateY(2px);box-shadow:inset 0 1px 0 var(--hl),0 0 0 var(--key-edge)}
 .key.out{opacity:.3;text-decoration:line-through}
-.key.in{border-color:var(--hit);color:var(--hit)}
-.key.go{background:var(--accent);color:#04121d;border-color:transparent;font:700 18px system-ui,sans-serif}
-.key.back{font-size:22px}
-.key[disabled]{opacity:.25;pointer-events:none}
+.key.in{border-color:var(--hit);color:var(--hit);box-shadow:inset 0 0 0 1px var(--hit),0 2px 0 var(--key-edge)}
+.key.go{background:linear-gradient(180deg,var(--accent),var(--accent-deep));color:var(--on-accent);border-color:transparent;
+  font:700 17px var(--display);box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 2px 0 var(--key-edge)}
+.key.back{color:var(--muted)}
+.key[disabled]{opacity:.28;pointer-events:none}
 
-/* notes */
-.toolhead{display:flex;align-items:center;justify-content:space-between;margin:10px 0 6px;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
-.toolhead button{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);padding:4px 0}
+/* ---------- notes ---------- */
+.toolhead{display:flex;align-items:center;justify-content:space-between;margin:10px 0 6px;font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.09em;font-weight:600}
+.toolhead button{font-size:11.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--accent);padding:4px 0;font-weight:700}
 .notes{display:grid;grid-template-columns:repeat(10,1fr);gap:4px;margin-bottom:10px}
-.chip{height:34px;border-radius:9px;background:var(--panel);border:1px solid var(--line);font:600 17px var(--mono)}
-.chip.s1{opacity:.4;text-decoration:line-through;color:var(--danger);border-color:transparent}
-.chip.s2{background:rgba(46,229,157,.14);border-color:var(--hit);color:var(--hit)}
+.chip{height:34px;border-radius:10px;background:var(--panel2);border:1px solid var(--line);font:700 16px var(--mono)}
+.chip.s1{opacity:.42;text-decoration:line-through;color:var(--danger);border-color:transparent}
+.chip.s2{background:color-mix(in srgb,var(--hit) 14%,transparent);border-color:var(--hit);color:var(--hit)}
 .grid{display:grid;grid-template-columns:44px repeat(10,1fr);gap:4px;align-items:center}
-.grid .lab{font-size:12px;color:var(--muted);text-align:center}
-.cell{height:34px;border-radius:8px;background:var(--panel);border:1px solid var(--line);font:600 15px var(--mono);color:var(--muted)}
-.cell.s1{background:rgba(255,92,122,.1);border-color:rgba(255,92,122,.35);color:var(--danger)}
-.cell.s2{background:rgba(46,229,157,.14);border-color:var(--hit);color:var(--hit)}
+.grid .lab{font-size:11.5px;color:var(--muted);text-align:center}
+.cell{height:34px;border-radius:9px;background:var(--panel2);border:1px solid var(--line);font:700 15px var(--mono);color:var(--muted)}
+.cell.s1{background:color-mix(in srgb,var(--danger) 10%,transparent);border-color:color-mix(in srgb,var(--danger) 35%,transparent);color:var(--danger)}
+.cell.s2{background:color-mix(in srgb,var(--hit) 14%,transparent);border-color:var(--hit);color:var(--hit)}
 
-/* play layout */
+/* ---------- play layout ---------- */
 .topbar{display:flex;align-items:center;gap:10px;margin-bottom:10px}
 .topbar .t{flex:1;min-width:0}
 .topbar .t h2{font-size:20px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.topbar .t div{font-size:13px;color:var(--muted);margin-top:2px}
-.peek{height:44px;padding:0 12px;border-radius:12px;background:var(--panel);border:1px solid var(--line);font-size:13px;color:var(--muted);min-width:92px}
-.peek.on{color:var(--text);font:700 18px var(--mono);letter-spacing:.15em}
-.opp{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px 12px;margin-bottom:10px}
+.topbar .t div{font-size:12.5px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.peek{height:44px;padding:0 12px;border-radius:14px;background:var(--panel2);border:1px solid var(--line);box-shadow:inset 0 1px 0 var(--hl);
+  font-size:13px;color:var(--muted);min-width:92px;display:flex;align-items:center;justify-content:center;gap:6px;font-weight:600}
+.peek.on{color:var(--text);font:800 18px var(--mono);letter-spacing:.15em}
+.opp{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--muted);background:var(--panel);border:1px solid var(--line);
+  border-radius:14px;padding:9px 12px;margin-bottom:10px;box-shadow:inset 0 1px 0 var(--hl)}
 .opp b{color:var(--text);font-weight:600}
 .opp .pegs{--pg:10px;gap:3px;margin-left:auto}
+.opp .ic{color:var(--muted)}
 .play{flex:1;min-height:0;display:flex;flex-direction:column}
 .play .left{flex:1;min-height:0;display:flex;flex-direction:column}
-.histwrap{flex:1;min-height:90px;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:10px}
+.histwrap{flex:1;min-height:90px;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:12px;
+  box-shadow:inset 0 1px 0 var(--hl),var(--shadow-sm);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px)}
 .history{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:6px;padding-right:2px;margin-top:8px}
-.row{display:flex;align-items:center;gap:12px;padding:6px 10px;border-radius:12px;background:var(--panel2)}
-.row .n{width:22px;color:var(--muted);font-size:13px;text-align:right;flex:none}
+.row{display:flex;align-items:center;gap:12px;padding:6px 10px;border-radius:14px;background:var(--panel2);border:1px solid transparent}
+.row .n{width:22px;color:var(--faint);font:700 12px var(--mono);text-align:right;flex:none}
 .row .d{display:flex;gap:6px}
-.row .d span{width:34px;height:38px;border-radius:9px;background:#0e141d;display:grid;place-items:center;font:700 22px var(--mono)}
-.row .zero{font-size:11px;color:var(--muted);margin-left:auto;text-transform:uppercase;letter-spacing:.06em}
+.row .d span{width:34px;height:38px;border-radius:10px;background:var(--tile);box-shadow:var(--tile-shadow);display:grid;place-items:center;font:800 21px var(--mono)}
+.row .zero{font-size:10.5px;color:var(--faint);margin-left:auto;text-transform:uppercase;letter-spacing:.08em;font-weight:700}
 .row .zero + .pegs{margin-left:0}
 .row .pegs{margin-left:auto}
-.row.win{background:rgba(46,229,157,.12);outline:1px solid var(--hit)}
-.row.new{animation:slidein .3s both}
-@keyframes slidein{from{opacity:0;transform:translateY(8px)}}
+.row.win{background:color-mix(in srgb,var(--hit) 12%,transparent);border-color:color-mix(in srgb,var(--hit) 60%,transparent)}
+.row.new{animation:slidein .32s cubic-bezier(.2,.8,.2,1) both}
+@keyframes slidein{from{opacity:0;transform:translateY(10px)}}
 .wideflex{display:none}
 .row .d span.hd{cursor:pointer}
 .row .d span.s1{opacity:.35;text-decoration:line-through;color:var(--danger)}
 .row .d span.s2{color:var(--hit);box-shadow:inset 0 0 0 2px var(--hit)}
 .tip{font-size:12px;color:var(--muted);text-align:center;padding-top:8px}
+.coach{display:flex;gap:10px;align-items:flex-start;background:color-mix(in srgb,var(--accent) 12%,var(--panel));border:1px solid color-mix(in srgb,var(--accent) 45%,transparent);
+  border-radius:14px;padding:10px 12px;font-size:13.5px;line-height:1.4;margin-bottom:10px;text-align:left}
+.coach .ic{color:var(--accent);margin-top:1px}
 .npane{gap:8px;margin-top:8px}
 .minis{display:flex;flex-wrap:wrap;gap:6px;flex:none}
-.mg{display:flex;align-items:center;gap:7px;background:var(--panel2);border-radius:9px;padding:5px 8px;font:700 15px var(--mono);letter-spacing:.06em}
+.mg{display:flex;align-items:center;gap:7px;background:var(--panel2);border-radius:10px;padding:5px 8px;font:800 15px var(--mono);letter-spacing:.06em}
 .mg i{font-style:normal}
 .mg i.s1{opacity:.35;text-decoration:line-through;color:var(--danger)}
 .mg i.s2{color:var(--hit)}
 .mg .pegs{--pg:8px;gap:2px}
 .ntable{display:grid;grid-template-columns:62px repeat(4,1fr);gap:5px;align-items:center;flex:none}
-.ntable .lab{font-size:11px;color:var(--muted);text-align:center;text-transform:uppercase;letter-spacing:.05em}
-.nd{height:34px;border-radius:9px;background:var(--panel2);border:1px solid var(--line);font:700 18px var(--mono);display:flex;align-items:center;justify-content:center;gap:5px}
+.ntable .lab{font-size:10.5px;color:var(--muted);text-align:center;text-transform:uppercase;letter-spacing:.06em;font-weight:600}
+.nd{height:34px;border-radius:10px;background:var(--panel2);border:1px solid var(--line);font:800 18px var(--mono);display:flex;align-items:center;justify-content:center;gap:5px}
 .nd small{font-size:13px}
 .nd.s1{color:var(--danger);opacity:.6}
-.nd.s2{color:var(--hit);border-color:var(--hit);background:rgba(46,229,157,.14)}
+.nd.s2{color:var(--hit);border-color:var(--hit);background:color-mix(in srgb,var(--hit) 14%,transparent)}
 .ntable .cell{height:34px;font-size:16px}
 .ntable .cell.dim{opacity:.3}
 .backbar{min-height:48px;margin-top:2px}
 .nfoot{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:12px;color:var(--muted);line-height:1.4;flex:none;padding-bottom:4px}
-.nfoot button{color:var(--accent);font-size:12px;text-transform:uppercase;letter-spacing:.06em;flex:none}
-.empty{margin:auto;text-align:center;color:var(--muted);font-size:14px;padding:20px;line-height:1.5}
+.nfoot button{color:var(--accent);font-size:12px;text-transform:uppercase;letter-spacing:.06em;flex:none;font-weight:700}
+.empty{margin:auto;text-align:center;color:var(--muted);font-size:14px;padding:20px;line-height:1.55}
 .assist{font-size:13px;color:var(--near);text-align:center;margin-top:8px}
 .controls{flex:none;padding-top:12px}
-.seg{display:flex;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:3px;margin:0 0 8px}
-.seg button{flex:1;height:36px;border-radius:9px;font-size:14px;color:var(--muted);font-weight:600}
-.seg button.on{background:var(--panel2);color:var(--text)}
-.result{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px;text-align:center}
-.result .big{display:flex;justify-content:center;gap:26px;margin:4px 0 14px;font-size:15px}
-.result .big div{display:flex;flex-direction:column;align-items:center;gap:6px}
-.result .big strong{font:800 30px var(--mono)}
+.seg{display:flex;background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:3px;margin:0 0 8px;box-shadow:inset 0 1px 2px rgba(0,0,0,.12)}
+.seg button{flex:1;height:38px;border-radius:11px;font-size:14px;color:var(--muted);font-weight:600;transition:background .15s,color .15s}
+.seg button.on{background:var(--raise);color:var(--text);box-shadow:0 2px 8px rgba(0,0,0,.18),inset 0 1px 0 var(--hl)}
+.result{background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:18px;text-align:center;
+  box-shadow:inset 0 1px 0 var(--hl),var(--shadow-sm);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);animation:enter .25s both}
+.result h2{font-size:22px}
+.result .big{display:flex;justify-content:center;gap:28px;margin:4px 0 14px;font-size:14px;color:var(--muted)}
+.result .big div{display:flex;flex-direction:column;align-items:center;gap:4px}
+.result .big strong{font:800 32px var(--mono)}
 .wideonly{display:none}
 
 @media (min-width:720px){
@@ -174,44 +244,77 @@ h1,h2,h3{margin:0}
   .tile{height:54px;width:48px}
 }
 
-/* cover / handoff */
-.cover{background:radial-gradient(circle at 50% 30%,#152235 0%,var(--bg) 70%)}
-.avatar{width:92px;height:92px;border-radius:50%;display:grid;place-items:center;font-size:40px;font-weight:800;margin:0 auto 18px;color:#07101a}
+/* ---------- hand-over screens ---------- */
+.cover{background:radial-gradient(70% 50% at 50% 30%,color-mix(in srgb,var(--accent) 14%,transparent) 0%,transparent 70%)}
+.avatar{width:96px;height:96px;border-radius:50%;display:grid;place-items:center;font:700 42px var(--display);margin:0 auto 18px;color:#07101a;
+  box-shadow:0 0 0 6px color-mix(in srgb,currentColor 0%,var(--panel)),0 14px 40px rgba(0,0,0,.35)}
 .cover h1{font-size:clamp(26px,7vw,38px);line-height:1.15}
-.cover p{font-size:16px;color:var(--muted);max-width:360px;margin:12px auto 30px;line-height:1.5}
+.cover p{font-size:16px;color:var(--muted);max-width:360px;margin:12px auto 30px;line-height:1.55}
 
-/* forms */
-.field{display:flex;flex-direction:column;gap:6px;text-align:left}
-.field label{font-size:13px;color:var(--muted)}
-.field input{height:52px;border-radius:12px;border:1px solid var(--line);background:var(--panel);color:var(--text);padding:0 14px;font-size:17px;outline:none;-webkit-user-select:text;user-select:text}
-.field input:focus{border-color:var(--accent)}
-.opt{display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 14px;text-align:left}
+/* ---------- forms ---------- */
+.field{display:flex;flex-direction:column;gap:7px;text-align:left}
+.field label{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-weight:600}
+.field input{height:52px;border-radius:14px;border:1px solid var(--line2);background:var(--solid);color:var(--text);padding:0 14px;font-size:17px;outline:none;-webkit-user-select:text;user-select:text}
+.field input:focus{border-color:var(--accent);box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 18%,transparent)}
+.field input[type=range]{height:auto;border:0;background:none;padding:0;accent-color:var(--accent);box-shadow:none}
+.opt{display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:13px 14px;text-align:left;width:100%;box-shadow:inset 0 1px 0 var(--hl)}
+.opt b{font-weight:600}
 .opt small{display:block;color:var(--muted);font-size:13px;margin-top:3px;line-height:1.35}
-.sw{width:52px;height:30px;border-radius:15px;background:#2a3748;position:relative;flex:none;transition:.2s}
-.sw::after{content:"";position:absolute;left:3px;top:3px;width:24px;height:24px;border-radius:50%;background:#fff;transition:.2s}
+.sw{width:52px;height:30px;border-radius:15px;background:var(--line2);position:relative;flex:none;transition:.2s}
+.sw::after{content:"";position:absolute;left:3px;top:3px;width:24px;height:24px;border-radius:50%;background:#fff;transition:.2s;box-shadow:0 2px 6px rgba(0,0,0,.3)}
 .sw.on{background:var(--hit)} .sw.on::after{left:25px}
-.pagehead{display:flex;align-items:center;gap:12px;margin-bottom:16px}
-.pagehead h2{font-size:22px}
+.pagehead{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.pagehead h2{font-size:24px}
 .content{max-width:640px;width:100%;margin:0 auto;display:flex;flex-direction:column;gap:12px;padding-bottom:24px}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;line-height:1.55;font-size:15px}
-.card h3{font-size:16px;margin-bottom:6px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:16px;line-height:1.55;font-size:15px;box-shadow:inset 0 1px 0 var(--hl)}
+.card h3{font-size:17px;margin-bottom:6px}
 .card p{margin:6px 0}
 .example{display:flex;align-items:center;gap:12px;margin:10px 0;flex-wrap:wrap}
 .example .row{flex:1;min-width:250px}
 
-/* sheet */
-.veil{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center;z-index:20;animation:fade .2s}
-.sheet{background:var(--panel);border:1px solid var(--line);border-radius:22px 22px 0 0;width:100%;max-width:520px;padding:20px 16px calc(20px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:10px;animation:up .25s}
-@media (min-width:720px){.veil{align-items:center}.sheet{border-radius:22px}}
+/* ---------- home ---------- */
+.home{padding-top:10px}
+.home .hero{margin-top:auto}
+.home .minirow{margin-bottom:auto}
+.homebar{display:flex;justify-content:flex-end;width:100%;max-width:520px;margin:0 auto}
+.hero{display:flex;flex-direction:column;align-items:center;margin:6px 0 4px}
+.modes{display:flex;flex-direction:column;gap:10px;width:100%;max-width:520px;margin:0 auto}
+.mode{display:flex;align-items:center;gap:14px;width:100%;text-align:left;padding:14px 16px;border-radius:20px;background:var(--panel);border:1px solid var(--line);
+  box-shadow:inset 0 1px 0 var(--hl),var(--shadow-sm);transition:transform .12s;-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px)}
+.mode:active{transform:scale(.98)}
+.mode .mi{width:46px;height:46px;border-radius:14px;display:grid;place-items:center;flex:none;color:var(--c);
+  background:color-mix(in srgb,var(--c) 15%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--c) 35%,transparent)}
+.mode .mt{flex:1;min-width:0}
+.mode .mt b{display:block;font:600 17px var(--display)}
+.mode .mt small{display:block;color:var(--muted);font-size:13px;margin-top:2px}
+.mode .chev{color:var(--faint)}
+.mode.cont{border-color:color-mix(in srgb,var(--hit) 50%,transparent);background:color-mix(in srgb,var(--hit) 9%,var(--panel))}
+.minirow{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;width:100%;max-width:520px;margin:12px auto 0}
+.mini{display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 6px;border-radius:16px;background:var(--panel2);border:1px solid var(--line);font-size:13px;font-weight:600;color:var(--muted)}
+.mini .ic{color:var(--text)}
+.homebadge{background:var(--hit);color:var(--on-hit);border-radius:99px;font-size:11.5px;padding:3px 9px;font-weight:800;margin-left:6px;vertical-align:1px}
+
+/* ---------- sheet ---------- */
+.veil{position:fixed;inset:0;background:var(--veil);display:flex;align-items:flex-end;justify-content:center;z-index:20;animation:fade .2s;-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px)}
+.sheet{background:var(--solid);border:1px solid var(--line);border-radius:26px 26px 0 0;width:100%;max-width:520px;padding:12px 16px calc(20px + env(safe-area-inset-bottom));
+  display:flex;flex-direction:column;gap:10px;animation:up .28s cubic-bezier(.2,.8,.2,1);box-shadow:var(--shadow)}
+.sheet::before{content:"";width:40px;height:5px;border-radius:3px;background:var(--line2);margin:0 auto 6px}
+@media (min-width:720px){.veil{align-items:center}.sheet{border-radius:26px;padding-top:20px}.sheet::before{display:none}}
 @keyframes fade{from{opacity:0}} @keyframes up{from{transform:translateY(40px);opacity:0}}
 
-/* banner */
+/* ---------- banner ---------- */
 .banner{position:fixed;inset:0;display:grid;place-items:center;pointer-events:none;z-index:30}
-.banner div{padding:18px 28px;border-radius:18px;background:rgba(17,24,35,.95);border:1px solid var(--line);font-size:24px;font-weight:800;animation:banner 1.3s both}
-@keyframes banner{0%{opacity:0;transform:scale(.8)}15%{opacity:1;transform:scale(1)}75%{opacity:1}100%{opacity:0;transform:scale(1.05)}}
+.banner div{padding:16px 26px;border-radius:20px;background:var(--solid);border:1px solid var(--line2);font:700 22px var(--display);
+  box-shadow:var(--shadow);animation:banner 1.4s both}
+@keyframes banner{0%{opacity:0;transform:scale(.85) translateY(10px)}14%{opacity:1;transform:none}76%{opacity:1}100%{opacity:0;transform:scale(1.03)}}
 
-/* over */
-.trophy{font-size:64px;margin-bottom:8px}
+/* ---------- results ---------- */
+.medal{width:96px;height:96px;border-radius:50%;display:grid;place-items:center;margin:0 auto 14px;color:var(--c);
+  background:radial-gradient(circle at 35% 30%,color-mix(in srgb,var(--c) 30%,transparent),color-mix(in srgb,var(--c) 8%,transparent));
+  box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--c) 55%,transparent),0 0 40px color-mix(in srgb,var(--c) 30%,transparent);animation:medal .6s cubic-bezier(.3,1.5,.5,1) both}
+.medal.win{--c:var(--hit)} .medal.tie{--c:var(--near)} .medal.lose{--c:var(--danger)} .medal.info{--c:var(--accent)}
+@keyframes medal{from{transform:scale(.4) rotate(-20deg);opacity:0}}
+.trophy{display:grid;place-items:center;margin-bottom:8px}
 .codes{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin:18px 0}
 .codes .card{min-width:150px;text-align:center}
 .codes .code{font:800 30px var(--mono);letter-spacing:.2em;margin-top:6px}
@@ -224,47 +327,73 @@ h1,h2,h3{margin:0}
 @media (min-width:720px){.boards{grid-template-columns:1fr 1fr}}
 .boards .histwrap{min-height:0}
 
-/* online */
+/* ---------- online & lists ---------- */
 .gamelist{display:flex;flex-direction:column;gap:8px}
-.gitem{display:flex;align-items:center;gap:12px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 14px;text-align:left;width:100%}
-.gitem .av{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;font-weight:800;color:#07101a;background:var(--p1);flex:none}
+.gitem{display:flex;align-items:center;gap:12px;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:12px 14px;text-align:left;width:100%;box-shadow:inset 0 1px 0 var(--hl)}
+.gitem .av{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;font:700 17px var(--display);color:#07101a;background:var(--p1);flex:none}
 .gitem .gt{flex:1;min-width:0}
-.gitem .gt b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gitem .gt b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600}
 .gitem .gt small{color:var(--muted);font-size:13px}
-.badge{font-size:12px;font-weight:700;padding:5px 10px;border-radius:99px;background:var(--panel2);color:var(--muted);flex:none;white-space:nowrap}
-.badge.go{background:var(--hit);color:#03170e}
-.joincode{font:800 clamp(40px,12vw,64px)/1.1 var(--mono);letter-spacing:.18em;color:var(--hit);margin:10px 0 4px}
-.spin{width:16px;height:16px;border:2.5px solid var(--line);border-top-color:var(--accent);border-radius:50%;display:inline-block;animation:spin 1s linear infinite;vertical-align:-3px;margin-right:8px}
+.badge{font-size:11.5px;font-weight:700;padding:5px 10px;border-radius:99px;background:var(--panel2);color:var(--muted);flex:none;white-space:nowrap;border:1px solid var(--line)}
+.badge.go{background:var(--hit);color:var(--on-hit);border-color:transparent}
+.joincode{font:800 clamp(40px,12vw,64px)/1.1 var(--mono);letter-spacing:.18em;color:var(--hit);margin:10px 0 4px;text-shadow:0 0 30px color-mix(in srgb,var(--hit) 35%,transparent)}
+.spin{width:16px;height:16px;border:2.5px solid var(--line2);border-top-color:var(--accent);border-radius:50%;display:inline-block;animation:spin 1s linear infinite;vertical-align:-3px;margin-right:8px}
 @keyframes spin{to{transform:rotate(360deg)}}
 .waiting{margin:10px 0 6px;font-weight:600}
 .minitabs{display:flex;gap:6px;margin-top:8px}
-.minitabs button{flex:1;height:34px;border-radius:9px;background:var(--panel2);color:var(--muted);font-size:13px;font-weight:600;border:1px solid transparent;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 6px}
-.minitabs button.on{color:var(--text);border-color:var(--line);background:#1d2a3b}
-.note{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 14px;font-size:14px;color:var(--muted);line-height:1.45;text-align:left}
+.minitabs button{flex:1;height:34px;border-radius:10px;background:var(--panel2);color:var(--muted);font-size:13px;font-weight:600;border:1px solid transparent;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 6px;display:flex;align-items:center;justify-content:center;gap:5px}
+.minitabs button.on{color:var(--text);border-color:var(--line2);background:var(--raise)}
+.note{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:12px 14px;font-size:14px;color:var(--muted);line-height:1.5;text-align:left;box-shadow:inset 0 1px 0 var(--hl)}
 .note b{color:var(--text)}
 .note .btn{margin-top:10px;min-height:44px;font-size:15px}
-.sectionlabel{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin:12px 2px 0}
-.field input.code-in{text-transform:uppercase;letter-spacing:.3em;font-family:var(--mono);font-size:26px;text-align:center}
+.sectionlabel{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.09em;margin:12px 2px 0;font-weight:700}
+.field input.code-in{text-transform:uppercase;letter-spacing:.3em;font:800 26px var(--mono);text-align:center}
 .err{color:var(--danger);font-size:14px;text-align:center;min-height:20px}
 .opp.tap{cursor:pointer}
-.opp.lastchance{background:rgba(255,181,71,.12);border-color:var(--near);color:var(--text)}
+.opp.lastchance{background:color-mix(in srgb,var(--near) 13%,var(--panel));border-color:var(--near);color:var(--text)}
 .opp.lastchance b{color:var(--near)}
+.opp.lastchance .ic{color:var(--near)}
 .stiles{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
 @media (min-width:720px){.stiles{grid-template-columns:repeat(4,1fr)}}
-.stile{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:2px}
+.stile{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:12px 14px;display:flex;flex-direction:column;gap:2px;box-shadow:inset 0 1px 0 var(--hl)}
 .stile b{font:800 24px var(--mono)}
 .stile span{font-size:12px;color:var(--muted)}
 .slist{display:flex;flex-direction:column;gap:6px}
-.srow{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.srow{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:10px 12px;box-shadow:inset 0 1px 0 var(--hl)}
 .srow > div{flex:1;min-width:0}
-.srow b{display:block;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.srow b{display:block;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600}
 .srow small{color:var(--muted);font-size:12px}
 .srow .when{flex:none;min-width:58px;text-align:right}
 .wl{display:flex;width:84px;height:8px;border-radius:4px;overflow:hidden;background:var(--panel2);flex:none}
 .wl i{display:block}
 .clock{font-family:var(--mono);font-variant-numeric:tabular-nums}
-.countdown{font:800 96px/1.1 var(--mono);color:var(--hit);margin:6px 0}
-.homebadge{background:var(--hit);color:#03170e;border-radius:99px;font-size:12px;padding:3px 9px;font-weight:800}
+.countdown{font:800 104px/1.1 var(--mono);color:var(--hit);margin:6px 0;text-shadow:0 0 40px color-mix(in srgb,var(--hit) 40%,transparent);animation:cd 1s ease-out infinite}
+@keyframes cd{0%{transform:scale(1.15);opacity:.6}25%{transform:scale(1);opacity:1}}
+
+/* ---------- intro walkthrough ---------- */
+.intro{padding-bottom:calc(14px + env(safe-area-inset-bottom))}
+.introtop{display:flex;justify-content:space-between;align-items:center;min-height:44px}
+.introbody{flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;justify-content:safe center;text-align:center;
+  max-width:460px;width:100%;margin:0 auto;gap:14px;overflow-y:auto}
+.introbody h1{font-size:clamp(26px,7.5vw,34px);line-height:1.15}
+.introbody p{color:var(--muted);font-size:16px;line-height:1.55;margin:0}
+.introbody .demo{width:100%;background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:16px;box-shadow:inset 0 1px 0 var(--hl),var(--shadow-sm)}
+.introbody .demo .row{background:var(--panel2)}
+.dots{display:flex;gap:7px;justify-content:center;margin:14px 0}
+.dots i{width:7px;height:7px;border-radius:4px;background:var(--line2);transition:all .25s}
+.dots i.on{width:22px;background:var(--accent)}
+.introfoot{display:flex;gap:10px;max-width:460px;width:100%;margin:0 auto}
+.introfoot .btn{flex:1}
+.introfoot .btn.ghost{flex:0 0 auto;width:auto;padding:0 18px}
+.demo .slots .tile{width:56px;height:64px;font-size:30px}
+.reveal-hit{outline:3px solid var(--hit);outline-offset:2px}
+.reveal-near{outline:3px solid var(--near);outline-offset:2px}
+.modechips{display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
+.modechips span{font-size:12.5px;font-weight:600;padding:6px 10px;border-radius:99px;background:var(--panel2);border:1px solid var(--line)}
+.waysgrid{display:grid;gap:8px;width:100%}
+.waysgrid .mode{padding:11px 14px}
+@media (prefers-reduced-motion:reduce){*{animation-duration:.01ms !important;transition-duration:.01ms !important}}
 </style>
 </head>
 <body>
@@ -279,7 +408,7 @@ const LS = {
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
   del(k) { try { localStorage.removeItem(k); } catch (e) {} }
 };
-const settings = Object.assign({ repeats: true, sound: true, haptics: true, assist: false, aiLevel: 'normal' }, LS.get('cb.settings', {}));
+const settings = Object.assign({ repeats: true, sound: true, haptics: true, assist: false, aiLevel: 'normal', theme: 'system', volume: 0.7 }, LS.get('cb.settings', {}));
 let names = LS.get('cb.names', ['Player 1', 'Player 2']);
 let wins = LS.get('cb.wins', {});          // name -> games won (pass-the-phone games)
 let game = LS.get('cb.game', null);        // the current pass-the-phone game
@@ -340,40 +469,131 @@ const entryStr = () => ui.entry.every(d => d !== null) ? ui.entry.join('') : nul
 const pColor = p => p === 0 ? 'var(--p0)' : 'var(--p1)';
 const initial = n => esc((String(n || '?').trim()[0] || '?').toUpperCase());
 
-/* ---------- sound & haptics ---------- */
-let actx = null;
-function tone(freq, dur, type, gain, delay) {
-  if (!settings.sound) return;
-  try {
-    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
-    if (actx.state === 'suspended') actx.resume();
-    const t = actx.currentTime + (delay || 0);
-    const o = actx.createOscillator(), g = actx.createGain();
-    o.type = type || 'sine'; o.frequency.value = freq;
-    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(gain || 0.08, t + 0.01);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(g); g.connect(actx.destination); o.start(t); o.stop(t + dur + 0.02);
-  } catch (e) {}
+/* ---------- icons (Feather, MIT) ---------- */
+const ICONS = {
+  back: '<polyline points="15 18 9 12 15 6"/>', next: '<polyline points="9 18 15 12 9 6"/>',
+  menu: '<line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/>',
+  users: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+  globe: '<circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>',
+  cpu: '<rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/>',
+  chart: '<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>',
+  book: '<path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>',
+  sliders: '<line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>',
+  sun: '<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>',
+  moon: '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>',
+  award: '<circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/>',
+  unlock: '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/>',
+  lock: '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+  play: '<polygon points="6 3 20 12 6 21 6 3"/>',
+  share: '<path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/>',
+  zap: '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',
+  clock: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+  flag: '<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/>',
+  bell: '<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>',
+  volume: '<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>',
+  del: '<path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"/><line x1="18" y1="9" x2="12" y2="15"/><line x1="12" y1="9" x2="18" y2="15"/>',
+  edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>',
+  eye: '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>',
+  equal: '<line x1="5" y1="9" x2="19" y2="9"/><line x1="5" y1="15" x2="19" y2="15"/>',
+  bulb: '<path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/>',
+  key: '<path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>',
+  target: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>'
+};
+const icon = (n, size) => `<svg class="ic" viewBox="0 0 24 24" width="${size || 20}" height="${size || 20}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[n]}</svg>`;
+const medal = (kind, name) => `<div class="trophy"><div class="medal ${kind}">${icon(name, 44)}</div></div>`;
+
+/* ---------- theme ---------- */
+const darkQuery = window.matchMedia ? matchMedia('(prefers-color-scheme: light)') : null;
+const currentTheme = () => (settings.theme || 'system') === 'system' ? (darkQuery && darkQuery.matches ? 'light' : 'dark') : settings.theme;
+function applyTheme() {
+  const t = currentTheme();
+  document.documentElement.dataset.theme = t;
+  const m = document.querySelector('meta[name="theme-color"]'); if (m) m.content = t === 'light' ? '#f2eee5' : '#060a11';
+  try { if (window.Android && Android.setTheme) Android.setTheme(t); } catch (e) {}
 }
+if (darkQuery && darkQuery.addEventListener) darkQuery.addEventListener('change', () => { if ((settings.theme || 'system') === 'system') { applyTheme(); render(); } });
+
+/* ---------- sound: synthesised in the app, so it works offline ---------- */
+const audio = { ctx: null, out: null, noise: null };
+function ac() {
+  if (!settings.sound) return null;
+  try {
+    if (!audio.ctx) {
+      const C = window.AudioContext || window.webkitAudioContext; if (!C) return null;
+      const ctx = new C(), comp = ctx.createDynamicsCompressor(), out = ctx.createGain();
+      comp.threshold.value = -16; comp.ratio.value = 5; comp.attack.value = 0.003; comp.release.value = 0.2;
+      out.connect(comp); comp.connect(ctx.destination);
+      const len = ctx.sampleRate * 1.5, buf = ctx.createBuffer(1, len, ctx.sampleRate), d = buf.getChannelData(0);
+      for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+      Object.assign(audio, { ctx, out, noise: buf });
+    }
+    audio.out.gain.value = 0.9 * (settings.volume == null ? 0.7 : settings.volume);
+    if (audio.ctx.state === 'suspended') audio.ctx.resume();
+    return audio.ctx;
+  } catch (e) { return null; }
+}
+function env(g, t, a, peak, dur) {
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(peak, t + a); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+}
+function osc(o) {   // {f, f2, type, at, dur, gain, attack}
+  const ctx = ac(); if (!ctx) return;
+  const t = ctx.currentTime + (o.at || 0), s = ctx.createOscillator(), g = ctx.createGain();
+  s.type = o.type || 'sine'; s.frequency.setValueAtTime(o.f, t);
+  if (o.f2) s.frequency.exponentialRampToValueAtTime(o.f2, t + o.dur);
+  env(g, t, o.attack || 0.004, o.gain || 0.1, o.dur);
+  s.connect(g); g.connect(audio.out); s.start(t); s.stop(t + o.dur + 0.05);
+}
+function hiss(o) {   // filtered noise burst: {at, dur, gain, freq, q, type, f2}
+  const ctx = ac(); if (!ctx) return;
+  const t = ctx.currentTime + (o.at || 0), src = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+  src.buffer = audio.noise; f.type = o.type || 'bandpass'; f.frequency.setValueAtTime(o.freq || 3000, t); f.Q.value = o.q || 1;
+  if (o.f2) f.frequency.exponentialRampToValueAtTime(o.f2, t + o.dur);
+  env(g, t, o.attack || 0.002, o.gain || 0.2, o.dur);
+  src.connect(f); f.connect(g); g.connect(audio.out); src.start(t, Math.random()); src.stop(t + o.dur + 0.05);
+}
+function bell(f, at, dur, gain) {   // bright two-partial bell
+  osc({ f, at, dur, gain, attack: 0.003 });
+  osc({ f: f * 2.756, at, dur: dur * 0.5, gain: gain * 0.28, attack: 0.002 });
+  osc({ f: f * 5.4, at, dur: dur * 0.18, gain: gain * 0.08, attack: 0.001 });
+}
+// kept for older call sites: a simple tone
+function tone(freq, dur, type, gain, delay) { osc({ f: freq, dur, type, gain: (gain || 0.08) * 1.4, at: delay || 0 }); }
 function buzz(p) { if (settings.haptics && navigator.vibrate) try { navigator.vibrate(p); } catch (e) {} }
 const sfx = {
-  key() { tone(620, 0.05, 'triangle', 0.04); buzz(8); },
-  back() { tone(380, 0.05, 'triangle', 0.04); buzz(8); },
-  err() { tone(160, 0.18, 'square', 0.05); buzz([30, 40, 30]); },
-  lock() { tone(440, 0.08, 'triangle', 0.07); tone(660, 0.12, 'triangle', 0.07, 0.08); buzz(25); },
-  result(e, n) {
+  tap() { hiss({ freq: 2600, q: 2, dur: 0.03, gain: 0.12 }); osc({ f: 900, f2: 700, dur: 0.04, gain: 0.03 }); },
+  key() { hiss({ freq: 3600, q: 1.6, dur: 0.028, gain: 0.22 }); osc({ f: 1900, f2: 1300, dur: 0.035, gain: 0.05 }); buzz(8); },
+  back() { hiss({ freq: 1800, q: 1.4, dur: 0.035, gain: 0.18 }); osc({ f: 520, f2: 380, dur: 0.06, gain: 0.05 }); buzz(8); },
+  note() { hiss({ freq: 5200, q: 3, dur: 0.018, gain: 0.12 }); buzz(5); },
+  err() { osc({ f: 150, type: 'square', dur: 0.09, gain: 0.05 }); osc({ f: 120, type: 'square', at: 0.11, dur: 0.12, gain: 0.05 }); buzz([30, 40, 30]); },
+  lock() {   // a heavy vault bolt sliding home
+    hiss({ type: 'lowpass', freq: 900, dur: 0.12, gain: 0.5 }); osc({ f: 150, f2: 55, dur: 0.18, gain: 0.35, type: 'triangle' });
+    hiss({ freq: 4200, q: 4, at: 0.09, dur: 0.03, gain: 0.25 }); osc({ f: 880, at: 0.1, dur: 0.12, gain: 0.04 }); buzz(30);
+  },
+  result(e, n) {   // one chime per peg: bright for right spot, softer for wrong spot
+    const hits = [1047, 1319, 1568, 2093];
     for (let i = 0; i < 4; i++) {
-      const f = i < e ? 880 : i < e + n ? 587 : 220;
-      tone(f, 0.12, i < e + n ? 'sine' : 'triangle', i < e + n ? 0.08 : 0.03, i * 0.09);
+      const at = i * 0.11;
+      if (i < e) bell(hits[i], at, 0.5, 0.09);
+      else if (i < e + n) bell(659, at, 0.35, 0.055);
+      else hiss({ freq: 600, q: 2, at, dur: 0.04, gain: 0.07 });
     }
+    if (!e && !n) osc({ f: 180, f2: 120, at: 0.1, dur: 0.25, gain: 0.08, type: 'triangle' });
     buzz(e + n ? [15, 60, 15] : 20);
   },
-  turn() { tone(660, 0.1, 'sine', 0.07); tone(990, 0.16, 'sine', 0.07, 0.1); buzz([20, 50, 20]); },
-  win() { [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, 0.25, 'sine', 0.09, i * 0.1)); buzz([40, 60, 40, 60, 120]); },
-  lose() { [392, 330, 262].forEach((f, i) => tone(f, 0.25, 'triangle', 0.07, i * 0.14)); buzz(80); }
+  turn() { bell(784, 0, 0.4, 0.07); bell(1175, 0.12, 0.55, 0.07); buzz([20, 50, 20]); },
+  tick() { osc({ f: 880, dur: 0.12, gain: 0.08 }); osc({ f: 1760, dur: 0.05, gain: 0.02 }); buzz(15); },
+  go() { bell(1319, 0, 0.6, 0.1); bell(1760, 0.04, 0.7, 0.08); buzz(60); },
+  win() {   // the vault swings open
+    hiss({ type: 'lowpass', freq: 200, f2: 2400, dur: 0.7, gain: 0.25, attack: 0.15 });
+    [523, 659, 784, 1047, 1319].forEach((f, i) => bell(f, 0.12 + i * 0.09, 0.9, 0.08));
+    [1047, 1319, 1568].forEach(f => bell(f, 0.7, 1.4, 0.05));
+    osc({ f: 2093, at: 0.75, dur: 1.2, gain: 0.025 });
+    buzz([40, 60, 40, 60, 120]);
+  },
+  lose() { [440, 370, 311, 262].forEach((f, i) => osc({ f, at: i * 0.15, dur: 0.35, gain: 0.07, type: 'triangle' })); osc({ f: 131, at: 0.6, dur: 0.6, gain: 0.08, type: 'sine' }); buzz(80); },
+  ping() { osc({ f: 330, dur: 0.07, gain: 0.05, type: 'triangle' }); }
 };
 
-/* ================= pass-the-phone game ================= */
 /* ---------- modes, clocks, history ---------- */
 const MODES = {
   classic: { name: 'Classic', desc: 'Take turns. First to crack the code wins — and if the player who went first cracks it, the other gets one last turn to tie.' },
@@ -401,8 +621,11 @@ setInterval(() => {
   });
   document.querySelectorAll('.countdown').forEach(el => {
     const left = +el.dataset.at - (Date.now() + (+el.dataset.off || 0));
-    if (left > 0) el.textContent = Math.min(3, Math.ceil(left / 1000));
-    else if (!el.dataset.fired) { el.dataset.fired = '1'; el.textContent = 'GO!'; sfx.turn(); setTimeout(render, 350); }
+    if (left > 0) {
+      const v = Math.min(3, Math.ceil(left / 1000));
+      if (el.textContent !== String(v)) { el.textContent = v; if (left < 3100) sfx.tick(); }
+    }
+    else if (!el.dataset.fired) { el.dataset.fired = '1'; el.textContent = 'GO!'; sfx.go(); setTimeout(render, 350); }
   });
 }, 100);
 let gameLog = LS.get('cb.history', []);
@@ -557,7 +780,7 @@ function keypad(goLabel, goReady, notes) {
   const dis = d => ui.codeMode && !ui.codeRepeats && ui.entry.some((x, i) => x === d && i !== ui.cursor);
   const k = d => `<button class="key ${st(d)}" data-act="key" data-d="${d}" ${dis(d) ? 'disabled' : ''}>${d}</button>`;
   return `<div class="keys">${[1, 2, 3, 4, 5, 6, 7, 8, 9].map(k).join('')}
-    <button class="key back" data-act="bksp" aria-label="Delete">⌫</button>${k(0)}
+    <button class="key back" data-act="bksp" aria-label="Delete">${icon('del', 24)}</button>${k(0)}
     <button class="key go" data-act="go" ${goReady && !ui.busy ? '' : 'disabled'}>${ui.busy ? '…' : goLabel}</button></div>`;
 }
 function codeEntry(o) {
@@ -569,7 +792,7 @@ function codeEntry(o) {
     <div style="flex:1;display:flex;flex-direction:column;justify-content:center;max-width:460px;width:100%;margin:0 auto">
       <p class="muted" style="text-align:center;margin:0 0 18px;line-height:1.5">${o.note}</p>
       ${slotsHtml(!ui.reveal)}
-      <div style="display:flex;justify-content:center;margin-bottom:14px"><button class="peek" data-act="reveal">${ui.reveal ? 'Hide code' : 'Show code'}</button></div>
+      <div style="display:flex;justify-content:center;margin-bottom:14px"><button class="peek" data-act="reveal">${icon('eye', 16)}${ui.reveal ? 'Hide code' : 'Show code'}</button></div>
       ${keypad('Lock in', !!entryStr(), null)}
     </div></div>`;
 }
@@ -647,29 +870,34 @@ function assistHtml(b) {
 /* ---------- pass-the-phone views ---------- */
 function vHome() {
   const cont = game && (game.phase !== 'over' || game.pending);
-  const w0 = wins[names[0]] || 0, w1 = wins[names[1]] || 0;
-  const yt = yourTurnCount();
-  return `<div class="screen center scroll">
-    <div class="logopegs pegs" style="--pg:26px"><span class="peg hit"></span><span class="peg near"></span><span class="peg hit"></span><span class="peg"></span></div>
-    <div class="logo">CODE<span>BREAKER</span></div>
-    <div class="tag muted">Crack their code before they crack yours.</div>
-    <div class="stack">
-      ${cont ? `<button class="btn primary" data-act="continue">Continue game</button>` : ''}
-      <button class="btn ${cont ? '' : 'primary'}" data-act="new">Pass-the-phone game</button>
-      <button class="btn" data-act="online">Play online ${yt ? `<span class="homebadge">${yt} your turn</span>` : ''}</button>
-      <button class="btn" data-act="ai">${ai && ai.phase !== 'over' ? `Continue vs computer · ${LEVELS[ai.level]}` : 'Play the computer'}</button>
-      <button class="btn" data-act="stats">Stats</button>
-      <button class="btn" data-act="rules">How to play</button>
-      <button class="btn" data-act="settings">Settings</button>
+  const yt = yourTurnCount(), aiLive = ai && ai.phase !== 'over';
+  const card = (act, ic, color, title, sub, extra, cls) => `<button class="mode ${cls || ''}" data-act="${act}" style="--c:${color}">
+      <span class="mi">${icon(ic, 24)}</span><span class="mt"><b>${title}${extra || ''}</b><small>${sub}</small></span><span class="chev">${icon('next', 20)}</span></button>`;
+  return `<div class="screen scroll home">
+    <div class="homebar"><button class="iconbtn" data-act="theme" aria-label="Switch theme">${icon(currentTheme() === 'light' ? 'moon' : 'sun', 20)}</button></div>
+    <div class="hero">
+      <div class="logopegs pegs"><span class="peg hit"></span><span class="peg near"></span><span class="peg hit"></span><span class="peg"></span></div>
+      <div class="logo">CODE<span>BREAKER</span></div>
+      <div class="tag">Crack their code before they crack yours.</div>
     </div>
-    ${(w0 || w1) ? `<div class="score" style="margin-top:26px">${esc(names[0])}<b>${w0}</b>–<b>${w1}</b>${esc(names[1])}</div>` : ''}
+    <div class="modes">
+      ${cont ? card('continue', 'play', 'var(--hit)', 'Continue game', `${esc(game.names[0])} vs ${esc(game.names[1])} · ${MODES[game.mode || 'classic'].name}`, '', 'cont') : ''}
+      ${card('online', 'globe', 'var(--accent)', 'Play online', 'Challenge a friend on their own phone', yt ? `<span class="homebadge">${yt} your turn</span>` : '')}
+      ${card('ai', 'cpu', 'var(--p1)', aiLive ? 'Continue vs computer' : 'Play the computer', aiLive ? `${MODES[ai.mode || 'classic'].name} · ${LEVELS[ai.level]}` : 'Easy, Normal or Hard', '', aiLive ? 'cont' : '')}
+      ${card('new', 'users', 'var(--near)', 'Pass the phone', 'Two players, one device')}
+    </div>
+    <div class="minirow">
+      <button class="mini" data-act="stats">${icon('chart', 22)}Stats</button>
+      <button class="mini" data-act="rules">${icon('book', 22)}How to play</button>
+      <button class="mini" data-act="settings">${icon('sliders', 22)}Settings</button>
+    </div>
   </div>`;
 }
 function vNew() {
   const r = settings.repeats;
   const first = ui.first === undefined ? 0 : ui.first;
   return `<div class="screen scroll"><div class="content">
-    <div class="pagehead"><button class="iconbtn" data-act="home">‹</button><h2>Pass-the-phone game</h2></div>
+    <div class="pagehead"><button class="iconbtn" data-act="home" aria-label="Back">${icon('back', 22)}</button><h2>Pass-the-phone game</h2></div>
     ${modePicker('ptpmode', ['classic', 'playout', 'trial'], settings.ptpMode || 'classic')}
     <div class="field"><label>Player 1</label><input id="n0" maxlength="14" value="${esc(names[0])}" autocomplete="off"></div>
     <div class="field"><label>Player 2</label><input id="n1" maxlength="14" value="${esc(names[1])}" autocomplete="off"></div>
@@ -713,7 +941,7 @@ function vCover() {
 }
 function vCode() {
   const p = game.cover.p;
-  return codeEntry({ left: `<button class="iconbtn" data-act="menu">≡</button>`,
+  return codeEntry({ left: `<button class="iconbtn" data-act="menu" aria-label="Menu">${icon('menu', 22)}</button>`,
     title: `<span style="color:${pColor(p)}">${esc(game.names[p])}</span>, set your code`,
     note: `${esc(game.names[other(p)])} will try to crack this. Pick something you can remember!`, repeats: game.repeats });
 }
@@ -744,13 +972,13 @@ function vPlay() {
   let bar;
   if (mode === 'trial') {
     const ot = game.time[o];
-    bar = `<div class="opp"><span>⏱ ${clockHtml(game.t0[p])}</span><span class="muted" style="margin-left:auto">${ot != null ? `to beat: <b>${isFinite(ot) ? fmtTime(ot) : '—'}</b>` : 'first to solve'}</span></div>`;
+    bar = `<div class="opp">${icon('clock', 16)}<span>${clockHtml(game.t0[p])}</span><span class="muted" style="margin-left:auto">${ot != null ? `to beat: <b>${isFinite(ot) ? fmtTime(ot) : '—'}</b>` : 'first to solve'}</span></div>`;
   } else if (mode === 'playout' && od != null && !game.pending) {
     bar = playoutBar(on, od, b.mine.length, 'treveal');
   } else if (game.cracked != null && game.cracked !== p && !game.pending) bar = lastChanceBar(on, 'your');
   else bar = `<div class="opp"><span><b style="color:${pColor(o)}">${on}</b> has made ${plural(b.theirs.length, 'guess')} on your code</span>${b.theirs.length ? `<span class="muted">best</span>${pegs(best.e, best.n)}` : ''}</div>`;
   return `<div class="screen">
-    <div class="topbar"><button class="iconbtn" data-act="menu">≡</button>
+    <div class="topbar"><button class="iconbtn" data-act="menu" aria-label="Menu">${icon('menu', 22)}</button>
       <div class="t"><h2><span style="color:${pColor(p)}">${nm}</span>${mode === 'trial' ? ' is solving' : "'s turn"}</h2><div>${MODES[mode].name} · guess #${b.mine.length + (game.pending ? 0 : 1)} · cracking ${on}'s code</div></div>
       <button class="peek" id="peek">My code</button></div>
     ${bar}
@@ -761,15 +989,15 @@ function vPlay() {
 }
 // play it out: the other player has cracked your code; you need to match or beat their count
 function playoutBar(who, theirN, myCount, revealAct) {
-  if (!isFinite(theirN)) return `<div class="opp lastchance">🏳️ <span><b>${who}</b> gave up — crack the code in any number of guesses to win.</span></div>`;
-  if (myCount >= theirN) return `<div class="opp lastchance">🏁 <span><b>${who}</b> cracked yours in ${theirN} — they win on guesses. Keep going to finish, or <button data-act="${revealAct}" style="color:var(--near);text-decoration:underline;font-weight:700">reveal the code</button>.</span></div>`;
-  return `<div class="opp lastchance">🏁 <span><b>${who}</b> cracked yours in <b>${theirN}</b>. Crack it in ${theirN - 1 > myCount ? `${theirN - 1} or fewer to win, ${theirN} to tie` : theirN - 1 === myCount ? `your next guess to tie` : ''}.</span></div>`;
+  if (!isFinite(theirN)) return `<div class="opp lastchance">${icon('flag', 16)}<span><b>${who}</b> gave up — crack the code in any number of guesses to win.</span></div>`;
+  if (myCount >= theirN) return `<div class="opp lastchance">${icon('flag', 16)}<span><b>${who}</b> cracked yours in ${theirN} — they win on guesses. Keep going to finish, or <button data-act="${revealAct}" style="color:var(--near);text-decoration:underline;font-weight:700">reveal the code</button>.</span></div>`;
+  return `<div class="opp lastchance">${icon('flag', 16)}<span><b>${who}</b> cracked yours in <b>${theirN}</b>. Crack it in ${theirN - 1 > myCount ? `${theirN - 1} or fewer to win, ${theirN} to tie` : theirN - 1 === myCount ? `your next guess to tie` : ''}.</span></div>`;
 }
 function localHistory(b, fresh) {
   const notes = ui.otab === 'notes' && !game.pending;
   const tabs = game.pending ? '' : `<div class="minitabs narrowonly">
     <button data-act="otab" data-v="mine" class="${notes ? '' : 'on'}">My guesses (${b.mine.length})</button>
-    <button data-act="otab" data-v="notes" class="${notes ? 'on' : ''}">📝 Notes</button></div>`;
+    <button data-act="otab" data-v="notes" class="${notes ? 'on' : ''}">${icon('edit', 14)}Notes</button></div>`;
   return historyHtml(b.mine, fresh, 'Enter 4 digits below and tap Guess.', tabs, { notes: b.notes, pane: notes ? notesPane(b) : '' });
 }
 function localOverLine() {
@@ -784,7 +1012,7 @@ function vOver() {
   const w0 = wins[game.names[0]] || 0, w1 = wins[game.names[1]] || 0, tie = game.winner === null;
   const firstUp = tie ? other(game.starter) : other(game.winner);
   return `<div class="screen center scroll">
-    <div class="trophy">${tie ? '🤝' : '🏆'}</div>
+    ${tie ? medal('tie', 'equal') : medal('win', 'award')}
     <h1 style="font-size:clamp(26px,7vw,40px)">${tie ? "It's a tie!" : `<span style="color:${pColor(game.winner)}">${esc(game.names[game.winner])}</span> wins!`}</h1>
     <p class="muted" style="margin:8px 0 0">${localOverLine()}</p>
     ${codesCards(game.names, game.codes)}
@@ -796,7 +1024,7 @@ function vOver() {
     </div></div>`;
 }
 // fair finish: if the first player cracks the code, the other player gets one last turn to tie
-const lastChanceBar = (who, them) => `<div class="opp lastchance">⚡ <span><b>${who}</b> cracked ${them} code! <b>Last chance</b> — crack it now to tie.</span></div>`;
+const lastChanceBar = (who, them) => `<div class="opp lastchance">${icon('zap', 16)}<span><b>${who}</b> cracked ${them} code! <b>Last chance</b> — crack it now to tie.</span></div>`;
 function codesCards(nms, codes) {
   const lab = n => n === 'You' ? 'Your code' : `${esc(n)}'s code`;
   return `<div class="codes">
@@ -808,7 +1036,7 @@ function reviewScreen(nms, codes, lists, backAct) {
     <h3 style="margin:0 0 8px;font-size:15px"><span style="color:${pColor(p)}">${esc(nms[p])}</span> guessing ${esc(nms[other(p)])}'s code <span class="mono muted">(${codes[other(p)]})</span></h3>
     ${historyHtml(lists[p], false, '')}</div>`;
   return `<div class="screen scroll">
-    <div class="pagehead"><button class="iconbtn" data-act="${backAct}">‹</button><h2>Both boards</h2></div>
+    <div class="pagehead"><button class="iconbtn" data-act="${backAct}" aria-label="Back">${icon('back', 22)}</button><h2>Both boards</h2></div>
     <div class="boards">${board(0)}${board(1)}</div></div>`;
 }
 const vReview = () => reviewScreen(game.names, game.codes, game.guesses, 'backover');
@@ -816,7 +1044,7 @@ const vReview = () => reviewScreen(game.names, game.codes, game.guesses, 'backov
 /* ---------- rules / settings / sheets ---------- */
 function vRules() {
   return `<div class="screen scroll"><div class="content">
-    <div class="pagehead"><button class="iconbtn" data-act="goback">‹</button><h2>How to play</h2></div>
+    <div class="pagehead"><button class="iconbtn" data-act="goback" aria-label="Back">${icon('back', 22)}</button><h2>How to play</h2></div>
     <div class="card"><h3>1. Set your secret codes</h3>
       <p>Each player secretly picks a 4-digit code using the numbers 0–9.</p></div>
     <div class="card"><h3>2. Take turns guessing</h3>
@@ -850,13 +1078,19 @@ function vRules() {
 }
 function vSettings() {
   const opt = (k, title, sub) => `<button class="opt" data-act="set" data-k="${k}"><div><b>${title}</b><small>${sub}</small></div><span class="sw ${settings[k] ? 'on' : ''}"></span></button>`;
+  const th = settings.theme || 'system';
   return `<div class="screen scroll"><div class="content">
-    <div class="pagehead"><button class="iconbtn" data-act="goback">‹</button><h2>Settings</h2></div>
-    ${opt('sound', 'Sound effects', 'Clicks, result chimes and a victory tune.')}
+    <div class="pagehead"><button class="iconbtn" data-act="goback" aria-label="Back">${icon('back', 22)}</button><h2>Settings</h2></div>
+    <div class="field"><label>Theme</label>
+      <div class="seg" style="margin:0">${[['system', 'Automatic'], ['dark', 'Dark'], ['light', 'Light']].map(([k, l]) => `<button data-act="settheme" data-v="${k}" class="${th === k ? 'on' : ''}">${l}</button>`).join('')}</div></div>
+    ${opt('sound', 'Sound effects', 'Key clicks, chimes for every clue, and a fanfare when the vault opens.')}
+    ${settings.sound ? `<div class="field"><label>Volume</label><input type="range" id="vol" min="0" max="1" step="0.05" value="${settings.volume == null ? 0.7 : settings.volume}"></div>` : ''}
     ${opt('haptics', 'Vibration', 'Little buzzes on key taps and results.')}
     ${opt('assist', 'Code counter (helper)', 'Shows how many codes still fit your clues, and warns when a guess can\'t be right. Makes the game easier.')}
-    ${me ? `<button class="opt" data-act="oname"><div><b>Online name</b><small>${esc(me.name)} — tap to change</small></div></button>` : ''}
+    ${me ? `<button class="opt" data-act="oname"><div><b>Online name</b><small>${esc(me.name)} — tap to change</small></div>${icon('next', 18)}</button>` : ''}
+    <button class="opt" data-act="intro"><div><b>Replay the introduction</b><small>The quick walkthrough of how to play.</small></div>${icon('next', 18)}</button>
     <button class="btn danger" data-act="resetwins" style="margin-top:10px">Reset pass-the-phone win tally</button>
+    <p class="muted" style="text-align:center;font-size:12px;margin:8px 0 0">Codebreaker · fonts: Space Grotesk & JetBrains Mono (SIL Open Font License) · icons: Feather (MIT)</p>
   </div></div>`;
 }
 const sheet = inner => `<div class="veil" data-act="closesheet"><div class="sheet" data-stop="1">${inner}</div></div>`;
@@ -960,7 +1194,7 @@ function alertsCard() {
   if (isIOS && !standalone())
     return `<div class="note"><b>Want a buzz when it's your turn?</b> Add Codebreaker to your Home Screen first: tap the <b>Share</b> button, then <b>Add to Home Screen</b>. Open it from the new icon and turn on alerts there.</div>`;
   if (!pushSupported()) return `<div class="note">This browser can't show turn alerts. The game still checks for moves while it's open.</div>`;
-  if (Notification.permission === 'granted' && ui.pushOk) return `<div class="note">🔔 <b>Turn alerts are on.</b> You'll get a buzz when it's your move.</div>`;
+  if (Notification.permission === 'granted' && ui.pushOk) return `<div class="note">${icon('bell', 16).replace('class="ic"', 'class="ic" style="display:inline;vertical-align:-3px;margin-right:6px;color:var(--hit)"')}<b>Turn alerts are on.</b> You'll get a buzz when it's your move.</div>`;
   if (Notification.permission === 'denied')
     return `<div class="note"><b>Turn alerts are blocked.</b> Turn on notifications for Codebreaker in your phone's settings to get a buzz on your turn.</div>`;
   return `<div class="note"><b>Get a buzz when it's your turn</b> — even when the app is closed.<button class="btn primary" data-act="opush">Turn on turn alerts</button></div>`;
@@ -969,7 +1203,7 @@ function alertsCard() {
 /* online views */
 function vOName() {
   return `<div class="screen scroll"><div class="content">
-    <div class="pagehead"><button class="iconbtn" data-act="${me ? 'goback' : 'home'}">‹</button><h2>${me ? 'Your online name' : 'Play online'}</h2></div>
+    <div class="pagehead"><button class="iconbtn" data-act="${me ? 'goback' : 'home'}" aria-label="Back">${icon('back', 22)}</button><h2>${me ? 'Your online name' : 'Play online'}</h2></div>
     ${me ? '' : `<p class="muted" style="margin:0;line-height:1.5">Play against a friend on their own phone — anywhere. First, what should your opponent see you as?</p>`}
     <div class="field"><label>Your name</label><input id="oname" maxlength="20" value="${esc(me ? me.name : (names[0] !== 'Player 1' ? names[0] : ''))}" autocomplete="off" placeholder="e.g. Nick"></div>
     <div class="err">${esc(ui.oerr)}</div>
@@ -1010,7 +1244,7 @@ function vOnline() {
     }).join('');
   }
   return `<div class="screen scroll"><div class="content">
-    <div class="pagehead"><button class="iconbtn" data-act="home">‹</button><h2 style="flex:1">Play online</h2>
+    <div class="pagehead"><button class="iconbtn" data-act="home" aria-label="Back">${icon('back', 22)}</button><h2 style="flex:1">Play online</h2>
       <button class="peek" data-act="oname" style="min-width:0">${esc(me.name)}</button></div>
     <div class="stack" style="max-width:none">
       <button class="btn primary" data-act="onew">New online game</button>
@@ -1024,7 +1258,7 @@ function vOnline() {
 }
 function vONew() {
   return `<div class="screen scroll"><div class="content">
-    <div class="pagehead"><button class="iconbtn" data-act="online">‹</button><h2>New online game</h2></div>
+    <div class="pagehead"><button class="iconbtn" data-act="online" aria-label="Back">${icon('back', 22)}</button><h2>New online game</h2></div>
     ${modePicker('omode', ['classic', 'playout', 'race'], settings.onlineMode || 'classic')}
     ${repeatsOpt('toggleNewRep')}
     <p class="muted" style="margin:0;line-height:1.5">Next you'll pick your secret code. Then you'll get a join code to send to your opponent. ${(settings.onlineMode || 'classic') === 'race' ? "The race starts once you're both on the game screen, after a 3-2-1 countdown." : 'A coin flip decides who guesses first.'}</p>
@@ -1033,7 +1267,7 @@ function vONew() {
 }
 function vOJoin() {
   return `<div class="screen scroll"><div class="content">
-    <div class="pagehead"><button class="iconbtn" data-act="online">‹</button><h2>Join a game</h2></div>
+    <div class="pagehead"><button class="iconbtn" data-act="online" aria-label="Back">${icon('back', 22)}</button><h2>Join a game</h2></div>
     <p class="muted" style="margin:0;line-height:1.5">Enter the 5-character join code your friend sent you.</p>
     <div class="field"><input id="ojoin" class="code-in" maxlength="5" autocomplete="off" autocapitalize="characters" spellcheck="false" value="${esc(ui.joinPrefill)}" placeholder="ABCDE"></div>
     <div class="err">${esc(ui.oerr)}</div>
@@ -1042,7 +1276,7 @@ function vOJoin() {
 }
 function vOCode() {
   const c = ui.ocode;
-  return codeEntry({ left: `<button class="iconbtn" data-act="online">‹</button>`, title: 'Set your secret code',
+  return codeEntry({ left: `<button class="iconbtn" data-act="online" aria-label="Back">${icon('back', 22)}</button>`, title: 'Set your secret code',
     note: `<b style="color:var(--text)">${MODES[c.gmode || 'classic'].name}</b> · ` + (c.mode === 'join' ? `${esc(c.host)} will try to crack this. Pick something you can remember!` : 'Your opponent will try to crack this. Pick something you can remember!'),
     repeats: c.repeats });
 }
@@ -1051,8 +1285,8 @@ function vOGame() {
   if (!st) return `<div class="screen center"><div class="note" style="max-width:420px">${ui.oerr ? esc(ui.oerr) : '<span class="spin"></span>Loading game…'}</div>
     <div class="stack" style="margin-top:14px"><button class="btn" data-act="olist">Back to my games</button></div></div>`;
   const opp = esc(oppName());
-  const top = (title, sub) => `<div class="topbar"><button class="iconbtn" data-act="olist">‹</button>
-    <div class="t"><h2>${title}</h2><div>${sub}</div></div><button class="iconbtn" data-act="omenu">≡</button></div>`;
+  const top = (title, sub) => `<div class="topbar"><button class="iconbtn" data-act="olist" aria-label="Back">${icon('back', 22)}</button>
+    <div class="t"><h2>${title}</h2><div>${sub}</div></div><button class="iconbtn" data-act="omenu" aria-label="Menu">${icon('menu', 22)}</button></div>`;
   if (st.status === 'waiting') {
     return `<div class="screen">${top('Waiting for opponent', 'Your code is locked in')}
       <div class="screen center" style="padding:0"><div class="content" style="align-items:center">
@@ -1065,7 +1299,7 @@ function vOGame() {
       <p class="muted" style="font-size:14px"><span class="spin"></span>Waiting for them to join…</p></div></div></div>`;
   }
   if (st.status === 'codes' && !st.my_code) {
-    return codeEntry({ left: `<button class="iconbtn" data-act="olist">‹</button>`, title: 'Rematch: pick your code',
+    return codeEntry({ left: `<button class="iconbtn" data-act="olist" aria-label="Back">${icon('back', 22)}</button>`, title: 'Rematch: pick your code',
       note: `<b style="color:var(--text)">${MODES[st.mode || 'classic'].name}</b> · ${opp} will try to crack it. ` + (st.mode === 'race' ? "The race starts when you're both ready." : `${st.starter === st.me ? 'You' : opp} will guess first.`), repeats: st.repeats });
   }
   if (st.status === 'codes') {
@@ -1084,7 +1318,7 @@ function vORace(st, top) {
     const row = (who, ok) => `<div class="gitem" style="pointer-events:none"><span class="gt"><b>${who}</b></span><span class="badge ${ok ? 'go' : ''}">${ok ? '✓ Ready' : '⏳ Not here yet'}</span></div>`;
     return `<div class="screen">${top('Race', 'Ready check')}
       <div class="screen center" style="padding:0"><div class="content" style="align-items:center;max-width:420px">
-      <div class="trophy">🏁</div>
+      ${medal('info', 'flag')}
       <p class="muted" style="margin:0 0 6px;line-height:1.5">The race starts as soon as you're <b style="color:var(--text)">both on this screen</b>, after a 3-2-1 countdown. Stay here!</p>
       <div class="gamelist" style="width:100%">${row('You', r[st.me])}${row(opp, themR)}</div>
       <p class="muted" style="font-size:14px"><span class="spin"></span>${themR ? 'Starting…' : `Waiting for ${opp}. We sent them a buzz.`}</p></div></div></div>`;
@@ -1099,16 +1333,16 @@ function vORace(st, top) {
   const tabs = `<div class="minitabs">
     <button data-act="otab" data-v="mine" class="${tab !== 'theirs' && tab !== 'notes' ? 'on' : ''}">Mine (${b.mine.length})</button>
     <button data-act="otab" data-v="theirs" class="${tab === 'theirs' ? 'on' : ''}">${opp}'s (${b.theirs.length})</button>
-    <button data-act="otab" data-v="notes" class="narrowonly ${tab === 'notes' ? 'on' : ''}">📝 Notes</button></div>`;
+    <button data-act="otab" data-v="notes" class="narrowonly ${tab === 'notes' ? 'on' : ''}">${icon('edit', 14)}Notes</button></div>`;
   const theirs = tab === 'theirs';
   const hist = theirs
     ? historyHtml(b.theirs, false, `${opp}'s guesses on your code <b class="mono">${esc(b.myCode)}</b> appear here live.`, tabs)
     : historyHtml(b.mine, fresh, 'Go go go! Enter 4 digits and tap Guess.', tabs, { notes: b.notes, pane: tab === 'notes' ? notesPane(b) : '' });
   const best = bestOf(b.theirs);
   return `<div class="screen">
-    <div class="topbar"><button class="iconbtn" data-act="olist">‹</button>
+    <div class="topbar"><button class="iconbtn" data-act="olist" aria-label="Back">${icon('back', 22)}</button>
       <div class="t"><h2>Race! ${clockHtml(st.started_at, null, off)}</h2><div>vs ${opp} · first to crack it wins</div></div>
-      <button class="iconbtn" data-act="omenu">≡</button><button class="peek" id="peek" style="min-width:84px">My code</button></div>
+      <button class="iconbtn" data-act="omenu" aria-label="Menu">${icon('menu', 22)}</button><button class="peek" id="peek" style="min-width:84px">My code</button></div>
     <button class="opp tap" data-act="otab" data-v="theirs" style="width:100%;text-align:left"><span><b style="color:var(--p1)">${opp}</b> live: ${plural(b.theirs.length, 'guess')}${b.theirs.length ? ' · best' : ''}</span>${b.theirs.length ? pegs(best.e, best.n) : ''}</button>
     <div class="play">
       <div class="left">${hist}${theirs ? '' : assistHtml(b)}</div>
@@ -1123,7 +1357,7 @@ function vOPlay(st, top) {
   const tabs = `<div class="minitabs">
     <button data-act="otab" data-v="mine" class="${tab !== 'theirs' && tab !== 'notes' ? 'on' : ''}">Mine (${b.mine.length})</button>
     <button data-act="otab" data-v="theirs" class="${tab === 'theirs' ? 'on' : ''}">${opp}'s (${b.theirs.length})</button>
-    <button data-act="otab" data-v="notes" class="narrowonly ${tab === 'notes' ? 'on' : ''}">📝 Notes</button></div>`;
+    <button data-act="otab" data-v="notes" class="narrowonly ${tab === 'notes' ? 'on' : ''}">${icon('edit', 14)}Notes</button></div>`;
   const theirs = tab === 'theirs';
   const hist = theirs
     ? historyHtml(b.theirs, false, `This is how close ${opp} is to your code <b class="mono">${esc(b.myCode)}</b>.`, tabs)
@@ -1136,18 +1370,18 @@ function vOPlay(st, top) {
     controls = `${noting ? `<button class="btn narrowonly backbar" data-act="otab" data-v="mine">Back to my guesses</button>` : ''}<div class="result ${noting ? 'wideonly' : ''}">
         ${last ? `<div class="muted" style="font-size:14px">Your guess <b class="mono" style="color:var(--text)">${last.g}</b></div>
           <div class="big" style="margin-bottom:4px"><div><strong style="color:var(--hit)">${last.e}</strong>right spot</div><div><strong style="color:var(--near)">${last.n}</strong>wrong spot</div></div>` : ''}
-        <div class="waiting"><span class="spin"></span>${st.cracked === st.me ? `🎉 You cracked it! ${opp} gets one last turn to tie…`
-          : st.mode === 'playout' && st.done[st.me] != null ? `🎉 You cracked it in ${st.done[st.me]}! ${opp} is still going…` : `${opp}'s turn to guess…`}</div>
+        <div class="waiting"><span class="spin"></span>${st.cracked === st.me ? `You cracked it! ${opp} gets one last turn to tie…`
+          : st.mode === 'playout' && st.done[st.me] != null ? `You cracked it in ${st.done[st.me]}! ${opp} is still going…` : `${opp}'s turn to guess…`}</div>
         <div class="muted" style="font-size:13px">${ui.pushOk ? "We'll buzz you when it's your move." : "You can leave — your game is saved."}</div></div>
       <div class="wideonly">${notesHead}<div class="notes">${t.chips}</div>
       <div class="toolhead"><span>Spot grid</span></div>${t.grid}</div>
-      ${tab === 'notes' ? '' : `<button class="btn narrowonly" data-act="otab" data-v="notes" style="margin-top:10px;min-height:46px">📝 Work on my notes</button>`}`;
+      ${tab === 'notes' ? '' : `<button class="btn narrowonly" data-act="otab" data-v="notes" style="margin-top:10px;min-height:46px">${icon('edit', 18)}Work on my notes</button>`}`;
   }
   const best = bestOf(b.theirs);
   return `<div class="screen">
-    <div class="topbar"><button class="iconbtn" data-act="olist">‹</button>
+    <div class="topbar"><button class="iconbtn" data-act="olist" aria-label="Back">${icon('back', 22)}</button>
       <div class="t"><h2>${myTurn ? '<span style="color:var(--hit)">Your turn</span>' : `${opp}'s turn`}</h2><div>Cracking ${opp}'s code · ${myTurn ? `guess #${b.mine.length + 1}` : `${plural(b.mine.length, 'guess')} so far`}</div></div>
-      <button class="iconbtn" data-act="omenu">≡</button><button class="peek" id="peek" style="min-width:84px">My code</button></div>
+      <button class="iconbtn" data-act="omenu" aria-label="Menu">${icon('menu', 22)}</button><button class="peek" id="peek" style="min-width:84px">My code</button></div>
     ${st.mode === 'playout' && st.done[1 - st.me] != null && myTurn ? playoutBar(opp, st.done[1 - st.me], b.mine.length, 'oresign')
       : st.cracked != null && st.cracked !== st.me && myTurn ? lastChanceBar(opp, 'your') : `<button class="opp tap" data-act="otab" data-v="theirs" style="width:100%;text-align:left"><span><b style="color:var(--p1)">${opp}</b> has made ${plural(b.theirs.length, 'guess')} on your code</span>${b.theirs.length ? `<span class="muted">best</span>${pegs(best.e, best.n)}` : ''}</button>`}
     <div class="play">
@@ -1170,7 +1404,7 @@ function vOOver(st) {
   else if (st.cracked != null) line = won ? `You cracked ${opp}'s code in ${plural(mine, 'guess')}, and their last chance missed.` : `${opp} cracked your code in ${plural(theirs, 'guess')}, and your last chance missed.`;
   else line = won ? `You cracked ${opp}'s code in ${plural(mine, 'guess')}. ${opp} made ${theirs}.` : `${opp} cracked your code in ${plural(theirs, 'guess')}. You made ${mine}.`;
   return `<div class="screen center scroll">
-    <div class="trophy">${tie ? '🤝' : won ? '🏆' : '🔓'}</div>
+    ${tie ? medal('tie', 'equal') : won ? medal('win', 'award') : medal('lose', 'unlock')}
     <h1 style="font-size:clamp(26px,7vw,40px)">${tie ? "It's a tie!" : won ? '<span style="color:var(--hit)">You win!</span>' : `${opp} wins`}</h1>
     <p class="muted" style="margin:8px 0 0">${line}</p>
     ${codesCards(st.names, codes)}
@@ -1218,7 +1452,7 @@ async function loadGame(quiet) {
         if (st.winner === st.me) { sfx.win(); confetti(); } else { sfx.lose(); showBanner(st.resigned ? `${esc(oppName())} gave up!` : `${esc(oppName())} cracked it first!`, 'var(--p1)'); }
       } else if (st.mode === 'race' && st.status === 'play') {
         if (st.started_at && !prev.started_at) sfx.turn();
-        else if (st.guesses.length > prev.guesses.length) tone(330, 0.08, 'triangle', 0.04);
+        else if (st.guesses.length > prev.guesses.length) sfx.ping();
       } else if (st.mode === 'playout' && st.status === 'play' && st.done[o] != null && prev.done[o] == null) {
         sfx.turn(); showBanner(`${esc(oppName())} cracked yours in ${st.done[o]}!`, 'var(--near)');
       } else if (st.status === 'over' && prev.status !== 'over') {
@@ -1419,7 +1653,7 @@ function aiScheduleMove() {
       const [, e] = aiComputerGuess();
       if (e === 4) { ai.tEnd = Math.min(Date.now(), ai.nextAt); aiFinish(1); saveAi(); return show(sfx.lose); }
       ai.nextAt += racePace(); saveAi();
-      show(() => tone(330, 0.08, 'triangle', 0.04));
+      show(() => sfx.ping());
       aiScheduleMove();
     }, Math.max(150, ai.nextAt - Date.now()));
     return;
@@ -1461,7 +1695,7 @@ function vANew() {
     hard: 'Picks the guess that rules out the most possibilities every turn. Usually 5 or 6.' };
   const rec = aiRecordFor(lv);
   return `<div class="screen scroll"><div class="content">
-    <div class="pagehead"><button class="iconbtn" data-act="home">‹</button><h2>Play the computer</h2></div>
+    <div class="pagehead"><button class="iconbtn" data-act="home" aria-label="Back">${icon('back', 22)}</button><h2>Play the computer</h2></div>
     <div class="field"><label>Difficulty</label>
       <div class="seg" style="margin:0">${Object.keys(LEVELS).map(k => `<button data-act="alevel" data-v="${k}" class="${lv === k ? 'on' : ''}">${LEVELS[k]}</button>`).join('')}</div>
       <small class="muted" style="line-height:1.45;font-size:13px">${desc[lv]}${rec.w + rec.l + (rec.d || 0) ? ` Your record on ${LEVELS[lv]}: <b style="color:var(--text)">${rec.w} won, ${rec.l} lost${rec.d ? `, ${rec.d} tied` : ''}</b>.` : ''}</small></div>
@@ -1479,8 +1713,8 @@ function vANew() {
 }
 function vAGame() {
   if (!ai) { ui.view = 'aNew'; return vANew(); }
-  if (ai.phase === 'code') return codeEntry({ left: `<button class="iconbtn" data-act="amenu">≡</button>`, title: 'Set your secret code',
-    note: `${MODES[ai.mode || 'classic'].name} vs the computer (${LEVELS[ai.level]}). It can't see your code — honest!`, repeats: ai.repeats });
+  if (ai.phase === 'code') return codeEntry({ left: `<button class="iconbtn" data-act="amenu" aria-label="Menu">${icon('menu', 22)}</button>`, title: 'Set your secret code',
+    note: ai.practice ? 'Practice game: pick any 4 digits as your secret code, then tap <b>Lock in</b>.' : `${MODES[ai.mode || 'classic'].name} vs the computer (${LEVELS[ai.level]}). It can't see your code — honest!`, repeats: ai.repeats });
   if (ai.phase === 'over') return vAOver();
   const race = ai.mode === 'race', started = race && Date.now() >= ai.t0;
   const b = aiBoard(), myTurn = race ? started : ai.turn === 0, tab = ui.otab;
@@ -1489,18 +1723,18 @@ function vAGame() {
   const tabs = `<div class="minitabs">
     <button data-act="otab" data-v="mine" class="${tab !== 'theirs' && tab !== 'notes' ? 'on' : ''}">Mine (${b.mine.length})</button>
     <button data-act="otab" data-v="theirs" class="${tab === 'theirs' ? 'on' : ''}">Computer (${b.theirs.length})</button>
-    <button data-act="otab" data-v="notes" class="narrowonly ${tab === 'notes' ? 'on' : ''}">📝 Notes</button></div>`;
+    <button data-act="otab" data-v="notes" class="narrowonly ${tab === 'notes' ? 'on' : ''}">${icon('edit', 14)}Notes</button></div>`;
   const theirs = tab === 'theirs';
   const hist = theirs
     ? historyHtml(b.theirs, false, `This is how close the computer is to your code <b class="mono">${esc(b.myCode)}</b>.`, tabs)
     : historyHtml(b.mine, fresh, myTurn ? 'Enter 4 digits and tap Guess.' : '', tabs, { notes: b.notes, pane: tab === 'notes' ? notesPane(b) : '' });
   let controls;
   if (race && !started) controls = `<div class="result"><div class="muted">The race starts in</div>${countdownHtml(ai.t0)}<div class="muted" style="font-size:13px">No turns — guess as fast as you can think.</div></div>`;
-  else if (myTurn) controls = guessControls(b);
+  else if (myTurn) controls = (tab === 'notes' ? '' : coachTip(b)) + guessControls(b);
   else {
     const last = b.mine[b.mine.length - 1], t = toolsHtml(b.notes), noting = tab === 'notes';
-    const waitText = ai.cracked === 0 ? '🎉 You cracked it! The computer gets one last turn to tie…'
-      : ai.mode === 'playout' && ai.done[0] != null ? `🎉 You cracked it in ${ai.done[0]}! The computer is still going…` : 'The computer is thinking…';
+    const waitText = ai.cracked === 0 ? 'You cracked it! The computer gets one last turn to tie…'
+      : ai.mode === 'playout' && ai.done[0] != null ? `You cracked it in ${ai.done[0]}! The computer is still going…` : 'The computer is thinking…';
     controls = `${noting ? `<button class="btn narrowonly backbar" data-act="otab" data-v="mine">Back to my guesses</button>` : ''}<div class="result ${noting ? 'wideonly' : ''}">
         ${last ? `<div class="muted" style="font-size:14px">Your guess <b class="mono" style="color:var(--text)">${last.g}</b></div>
           <div class="big" style="margin-bottom:4px"><div><strong style="color:var(--hit)">${last.e}</strong>right spot</div><div><strong style="color:var(--near)">${last.n}</strong>wrong spot</div></div>` : ''}
@@ -1514,7 +1748,7 @@ function vAGame() {
   else if (ai.mode === 'playout' && ai.done[1] != null && myTurn) bar = playoutBar('The computer', ai.done[1], b.mine.length, 'aresign');
   else if (ai.cracked === 1 && myTurn) bar = lastChanceBar('The computer', 'your');
   return `<div class="screen">
-    <div class="topbar"><button class="iconbtn" data-act="amenu">≡</button>
+    <div class="topbar"><button class="iconbtn" data-act="amenu" aria-label="Menu">${icon('menu', 22)}</button>
       <div class="t"><h2>${title}</h2><div>${MODES[ai.mode || 'classic'].name} · ${LEVELS[ai.level]} · ${myTurn ? `guess #${b.mine.length + 1}` : `${plural(b.mine.length, 'guess')} so far`}</div></div>
       <button class="peek" id="peek">My code</button></div>
     ${bar ? bar : `<button class="opp tap" data-act="otab" data-v="theirs" style="width:100%;text-align:left"><span><b style="color:var(--p1)">Computer</b> ${lastTheirs ? `last guessed <b class="mono">${lastTheirs.g}</b> on your code` : "hasn't guessed yet"}</span>${lastTheirs ? pegs(lastTheirs.e, lastTheirs.n) : ''}</button>`}
@@ -1533,7 +1767,7 @@ function vAOver() {
     : won ? (ai.cracked === 0 ? `You cracked its code in ${plural(mine, 'guess')}, and it missed its last chance.` : `You cracked its code in ${plural(mine, 'guess')}. The computer made ${theirs}.`)
     : (ai.cracked === 1 ? `The computer cracked your code in ${plural(theirs, 'guess')}, and your last chance missed.` : `The computer cracked your code in ${plural(theirs, 'guess')}. You made ${mine}.`);
   return `<div class="screen center scroll">
-    <div class="trophy">${tie ? '🤝' : won ? '🏆' : '🤖'}</div>
+    ${tie ? medal('tie', 'equal') : won ? medal('win', 'award') : medal('lose', 'cpu')}
     <h1 style="font-size:clamp(26px,7vw,40px)">${tie ? "It's a tie!" : won ? '<span style="color:var(--hit)">You win!</span>' : 'The computer wins'}</h1>
     <p class="muted" style="margin:8px 0 0">${line}</p>
     ${codesCards(ai.names, ai.codes)}
@@ -1583,7 +1817,7 @@ function statTile(big, label) { return `<div class="stile"><b>${big}</b><span>${
 function vStats() {
   const f = ui.sfilter || 'all';
   const seg = `<div class="seg" style="margin:0">${[['all', 'All'], ['online', 'Online'], ['ai', 'Computer'], ['local', '1 phone']].map(([k, l]) => `<button data-act="sfilter" data-v="${k}" class="${f === k ? 'on' : ''}">${l}</button>`).join('')}</div>`;
-  const head = `<div class="pagehead"><button class="iconbtn" data-act="home">‹</button><h2>Stats</h2></div>${seg}`;
+  const head = `<div class="pagehead"><button class="iconbtn" data-act="home" aria-label="Back">${icon('back', 22)}</button><h2>Stats</h2></div>${seg}`;
   if (f === 'local') return `<div class="screen scroll"><div class="content">${head}${localStats()}</div></div>`;
   const loading = me && !ui.ohist && f !== 'ai' ? `<div class="note"><span class="spin"></span>Loading your online games…</div>` : '';
   const recs = myRecords(f);
@@ -1647,6 +1881,107 @@ function localStats() {
     <div class="sectionlabel">Recent games</div><div class="slist">${recent}</div>${legacy}`;
 }
 
+/* ================= intro walkthrough ================= */
+const INTRO_STEPS = 6;
+function introRow(digits, e, n, opts) {
+  opts = opts || {};
+  const nd = opts.notes;
+  return `<div class="row ${opts.anim ? 'new' : ''}"><span class="n">1</span><div class="d">${digits.split('').map((c, i) => {
+    const cls = (nd ? `hd s${nd[+c]}` : '') + (opts.reveal && opts.reveal[i] ? ' ' + opts.reveal[i] : '');
+    return `<span class="${cls}" ${nd ? `data-act="inote" data-d="${c}"` : ''}>${c}</span>`;
+  }).join('')}</div>${pegs(e, n)}</div>`;
+}
+function vIntro() {
+  const st = ui.introStep || 0;
+  let body;
+  if (st === 0) body = `
+      <div class="logopegs pegs"><span class="peg hit"></span><span class="peg near"></span><span class="peg hit"></span><span class="peg"></span></div>
+      <div class="logo">CODE<span>BREAKER</span></div>
+      <h1 style="margin-top:10px">Two players. Two secret codes.</h1>
+      <p>Crack your opponent's 4-digit code before they crack yours. Here's how it works — it takes about a minute.</p>`;
+  else if (st === 1) body = `
+      <div class="medal info">${icon('lock', 40)}</div>
+      <h1>Pick a secret code</h1>
+      <div class="demo"><div class="slots"><div class="tile">3</div><div class="tile">5</div><div class="tile">0</div><div class="tile">9</div></div>
+        <p style="margin-top:12px;font-size:14px">Your opponent sees only <b class="mono" style="color:var(--text);letter-spacing:.3em">● ● ● ●</b></p></div>
+      <p>Each player chooses 4 digits from 0 to 9. Keep it hidden — the game never shows it to the other player.</p>`;
+  else if (st === 2) {
+    const rv = ui.introReveal;
+    body = `
+      <h1>Read the clues</h1>
+      <p>The secret code is <b class="mono" style="color:var(--text)">3509</b>. You guess <b class="mono" style="color:var(--text)">4592</b>:</p>
+      <div class="demo">${introRow('4592', 1, 1, { anim: true, reveal: rv ? [null, 'reveal-hit', 'reveal-near', null] : null })}
+        <div class="legend" style="justify-content:center;margin-top:12px;font-size:14px;color:var(--text)"><span><i class="hit"></i>right number, right spot</span><span><i class="near"></i>right number, wrong spot</span></div></div>
+      <p>${rv ? 'The <b style="color:var(--hit)">5</b> is in exactly the right spot. The <b style="color:var(--near)">9</b> is in the code, but somewhere else. In a real game you never get told which digits they are — that\'s the puzzle.'
+        : 'You get one green dot and one amber ring — but not which digits earned them.'}</p>
+      ${rv ? '' : `<button class="btn" data-act="ireveal" style="max-width:260px">${icon('eye', 18)}Which digits were they?</button>`}`;
+  } else if (st === 3) {
+    const nt = ui.introNotes || (ui.introNotes = new Array(10).fill(0));
+    const done = nt[4] === 1 && nt[2] === 1;
+    body = `
+      <div class="medal info">${icon('edit', 40)}</div>
+      <h1>Take notes as you go</h1>
+      <div class="demo">${introRow('4592', 1, 1, { notes: nt })}
+        <p style="margin-top:12px;font-size:14px">${done ? '<b style="color:var(--hit)">Nice!</b> Tap again to mark a digit ✓ for "definitely in the code".' : 'Try it: tap the <b style="color:var(--text)">4</b> and the <b style="color:var(--text)">2</b> to cross them out.'}</p></div>
+      <p>Tap any digit in your guesses to cross it out or mark it. The keypad shows your marks too, and the <b style="color:var(--text)">Notes</b> tab tracks which spot each number could go in.</p>`;
+  } else if (st === 4) {
+    const way = (ic, c, t, d) => `<div class="mode" style="--c:${c};pointer-events:none"><span class="mi">${icon(ic, 22)}</span><span class="mt"><b>${t}</b><small>${d}</small></span></div>`;
+    body = `
+      <h1>Play your way</h1>
+      <div class="waysgrid">
+        ${way('globe', 'var(--accent)', 'Online', 'Each on your own phone, anywhere — with turn alerts')}
+        ${way('cpu', 'var(--p1)', 'Vs the computer', 'Easy, Normal or Hard')}
+        ${way('users', 'var(--near)', 'Pass the phone', 'Two players sharing one device')}
+      </div>
+      <div class="modechips"><span>Classic</span><span>Play it out</span><span>Race</span><span>Time trial</span></div>
+      <p>Classic is first-to-crack. Try <b style="color:var(--text)">Race</b> online for a head-to-head against the clock.</p>`;
+  } else body = `
+      <div class="medal win">${icon('target', 40)}</div>
+      <h1>Ready to crack some codes?</h1>
+      <p>Warm up with a practice game against the computer — we'll give you tips along the way.</p>
+      <div class="stack" style="margin-top:6px">
+        <button class="btn primary" data-act="practice">${icon('play', 18)}Practice game</button>
+        <button class="btn" data-act="introdone">Go to the main menu</button>
+      </div>`;
+  const last = st === INTRO_STEPS - 1;
+  return `<div class="screen intro">
+    <div class="introtop"><span></span>${last ? '' : `<button class="linkbtn" data-act="introdone">Skip</button>`}</div>
+    <div class="introbody">${body}</div>
+    <div class="dots">${Array.from({ length: INTRO_STEPS }, (_, i) => `<i class="${i === st ? 'on' : ''}"></i>`).join('')}</div>
+    <div class="introfoot">
+      ${st > 0 ? `<button class="btn ghost" data-act="iprev" aria-label="Back">${icon('back', 20)}</button>` : ''}
+      ${last ? '' : `<button class="btn primary" data-act="inext">${st === 0 ? "Let's go" : 'Next'}${icon('next', 18)}</button>`}
+    </div></div>`;
+}
+function introGo(d) {
+  const n = Math.max(0, Math.min(INTRO_STEPS - 1, (ui.introStep || 0) + d));
+  if (n === ui.introStep) return;
+  ui.introStep = n; ui.introReveal = false; render();
+}
+function finishIntro() { LS.set('cb.introDone', true); ui.view = 'home'; ui.introStep = 0; render(); }
+// swipe left / right through the intro
+(() => {
+  let x0 = null, y0 = null;
+  document.addEventListener('touchstart', e => { if (ui.view !== 'intro') return; x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; }, { passive: true });
+  document.addEventListener('touchend', e => {
+    if (ui.view !== 'intro' || x0 === null) return;
+    const dx = e.changedTouches[0].clientX - x0, dy = e.changedTouches[0].clientY - y0; x0 = null;
+    if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) { sfx.tap(); introGo(dx < 0 ? 1 : -1); }
+  }, { passive: true });
+})();
+// practice game against Easy: short tips for the first few guesses
+function coachTip(b) {
+  if (!ai || !ai.practice) return '';
+  const n = b.mine.length;
+  const tips = [
+    'Make your first guess — any 4 digits. <b>0123</b> is a good start.',
+    'Green dots mean a right number in the right spot; amber rings mean a right number in the wrong spot. Use them to choose your next guess.',
+    'Tap a digit in your guesses to cross it out once you\'re sure it isn\'t in the code.',
+    'Stuck? Open the <b>Notes</b> tab to track which spot each number could go in.'
+  ];
+  return n < tips.length ? `<div class="coach">${icon('bulb', 18)}<span>${tips[n]}</span></div>` : '';
+}
+
 /* ---------- render ---------- */
 function render() {
   ui.typing = false; ui.codeMode = false; ui.peekCode = '';
@@ -1666,6 +2001,7 @@ function render() {
     case 'oReview': html = ui.og ? vOReview() : vOGame(); break;
     case 'aNew': html = vANew(); break;
     case 'stats': html = vStats(); break;
+    case 'intro': html = vIntro(); break;
     case 'aGame': html = vAGame(); break;
     case 'aReview': html = ai ? reviewScreen(ai.names, ai.codes, ai.guesses, 'aback') : vANew(); break;
     default:
@@ -1680,6 +2016,10 @@ function render() {
   const f = document.activeElement && document.activeElement.id && document.activeElement.tagName === 'INPUT' ? document.activeElement : null;
   const keep = f ? { id: f.id, v: f.value, s: f.selectionStart } : null;
   $app.innerHTML = html;
+  // gentle slide-in when you move to a different screen (not on every refresh)
+  const key = ui.view + ':' + (ui.view === 'game' && game ? game.phase + (game.cover ? game.cover.p : '') : ui.view === 'oGame' && ui.og ? ui.og.status + (ui.og.started_at ? 's' : '')
+    : ui.view === 'aGame' && ai ? ai.phase : ui.view === 'intro' ? ui.introStep : '');
+  if (key !== ui.lastKey) { const sc = $app.querySelector('.screen'); if (sc) sc.classList.add('enter'); ui.lastKey = key; }
   if (keep) { const n = document.getElementById(keep.id); if (n) { n.value = keep.v; n.focus(); try { n.setSelectionRange(keep.s, keep.s); } catch (e) {} } }
   const h = document.getElementById('hist'); if (h) h.scrollTop = h.scrollHeight;
   bindPeek();
@@ -1756,8 +2096,8 @@ function act(a, d) {
       return;
     case 'reveal': ui.reveal = !ui.reveal; break;
     case 'pass': passTurn(); return;
-    case 'note': { const b = curBoard(); if (!b) return; const n = b.notes.digits; n[+d.d] = (n[+d.d] + 1) % 3; b.save(); buzz(6); break; }
-    case 'cell': { const b = curBoard(); if (!b) return; const g = b.notes.grid; g[+d.i] = (g[+d.i] + 1) % 3; b.save(); buzz(6); break; }
+    case 'note': { const b = curBoard(); if (!b) return; const n = b.notes.digits; n[+d.d] = (n[+d.d] + 1) % 3; b.save(); sfx.note(); break; }
+    case 'cell': { const b = curBoard(); if (!b) return; const g = b.notes.grid; g[+d.i] = (g[+d.i] + 1) % 3; b.save(); sfx.note(); break; }
     case 'clearnotes': { const b = curBoard(); if (!b) return; b.notes.digits.fill(0); b.notes.grid.fill(0); b.save(); break; }
     case 'tool': ui.tool = d.v; break;
     case 'menu': ui.sheet = 'menu'; break;
@@ -1773,6 +2113,16 @@ function act(a, d) {
 
     case 'stats': ui.view = 'stats'; ui.sfilter = ui.sfilter || 'all'; render(); loadStats(); return;
     case 'sfilter': ui.sfilter = d.v; break;
+
+    case 'theme': settings.theme = currentTheme() === 'light' ? 'dark' : 'light'; saveSettings(); applyTheme(); break;
+    case 'settheme': settings.theme = d.v; saveSettings(); applyTheme(); break;
+    case 'intro': ui.back = ui.view; ui.view = 'intro'; ui.introStep = 0; ui.introNotes = null; break;
+    case 'inext': introGo(1); return;
+    case 'iprev': introGo(-1); return;
+    case 'ireveal': ui.introReveal = true; sfx.result(1, 1); break;
+    case 'inote': { const nt = ui.introNotes; nt[+d.d] = (nt[+d.d] + 1) % 3; sfx.note(); break; }
+    case 'introdone': finishIntro(); return;
+    case 'practice': LS.set('cb.introDone', true); aiNewGame('easy', true, 0, 'classic'); ai.practice = true; saveAi(); render(); return;
 
     /* vs computer */
     case 'ai': if (ai && ai.phase !== 'over') { ui.view = 'aGame'; resetEntry(); ui.otab = 'mine'; } else { ui.view = 'aNew'; ui.first = 0; } break;
@@ -1852,9 +2202,13 @@ function saveNames() {
 $app.addEventListener('click', e => {
   const t = e.target.closest('[data-act]');
   if (!t) return;
+  if (t.matches('.btn,.iconbtn,.mode,.mini,.seg button,.gitem,.opt,.minitabs button,.linkbtn,.tile')) sfx.tap();
   // taps inside a sheet should not trigger the veil's close
   if (t.classList.contains('veil') && e.target.closest('[data-stop]')) return;
   act(t.dataset.act, t.dataset);
+});
+$app.addEventListener('input', e => {
+  if (e.target.id === 'vol') { settings.volume = +e.target.value; saveSettings(); clearTimeout(ui.volT); ui.volT = setTimeout(() => sfx.result(2, 1), 120); }
 });
 // physical keyboard support (handy on a desktop / with a keyboard cover)
 document.addEventListener('keydown', e => {
@@ -1879,6 +2233,7 @@ window.cbBack = function () {
     case 'oNew': case 'oJoin': case 'oCode': case 'oGame': act('olist', {}); return true;
     case 'oReview': act('oback', {}); return true;
     case 'aNew': case 'stats': act('home', {}); return true;
+    case 'intro': if (ui.introStep > 0) introGo(-1); else finishIntro(); return true;
     case 'aReview': act('aback', {}); return true;
     case 'aGame':
       if (ai && ai.phase !== 'over') { ui.sheet = 'amenu'; render(); return true; }
@@ -1916,6 +2271,8 @@ if ('serviceWorker' in navigator && location.protocol === 'https:') {
 
 /* ---------- start ---------- */
 (function start() {
+  applyTheme();
+  if (!LS.get('cb.introDone', false) && !game && !ai && !me) ui.view = 'intro';
   const h = location.hash;
   const g = /#g=([0-9a-f-]{36})/.exec(h), j = /#join=([A-Za-z0-9]{5})/.exec(h);
   if (h) try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
