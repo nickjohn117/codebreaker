@@ -22,14 +22,20 @@ Deno.serve(async (req) => {
 
     const { data: me } = await db.from("cb_players").select("id,name").eq("secret", secret).maybeSingle();
     if (!me) return json({ error: "unknown player" }, 403);
-    const { data: g } = await db.from("cb_games").select("id,p0,p1,status,turn,winner,resigned").eq("id", game).maybeSingle();
+    const { data: g } = await db.from("cb_games").select("id,p0,p1,status,turn,winner,resigned,cracked,draw").eq("id", game).maybeSingle();
     if (!g || (g.p0 !== me.id && g.p1 !== me.id)) return json({ error: "not your game" }, 403);
     const seat = g.p0 === me.id ? 0 : 1;
     const oppId = seat === 0 ? g.p1 : g.p0;
     if (!oppId) return json({ sent: 0 });
 
     let body: string;
-    if (g.status === "over") body = g.resigned ? `${me.name} gave up — you win!` : `${me.name} cracked your code. Game over!`;
+    if (g.status === "over") {
+      if (g.resigned) body = `${me.name} gave up — you win!`;
+      else if (g.draw) body = `${me.name} cracked your code too — it's a tie!`;
+      else if (g.winner === seat) body = `${me.name} cracked your code. Game over!`;
+      else body = `${me.name} missed their last chance — you win!`;   // the sender just used their last-chance turn
+    }
+    else if (g.cracked === seat) body = `${me.name} cracked your code! Last chance — crack theirs to tie.`;
     else if (kind === "join") body = `${me.name} joined your game. ${g.turn === seat ? "They go first." : "You go first!"}`;
     else if (kind === "rematch") body = `${me.name} wants a rematch — pick your new code.`;
     else if (kind === "code") body = g.status === "play" ? `${me.name} is ready. ${g.turn === seat ? "They go first." : "Your move!"}` : `${me.name} picked their code.`;
