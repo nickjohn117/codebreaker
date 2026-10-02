@@ -247,6 +247,8 @@ h1,h2,h3{margin:0}
 .field input.code-in{text-transform:uppercase;letter-spacing:.3em;font-family:var(--mono);font-size:26px;text-align:center}
 .err{color:var(--danger);font-size:14px;text-align:center;min-height:20px}
 .opp.tap{cursor:pointer}
+.opp.lastchance{background:rgba(255,181,71,.12);border-color:var(--near);color:var(--text)}
+.opp.lastchance b{color:var(--near)}
 .homebadge{background:var(--hit);color:#03170e;border-radius:99px;font-size:12px;padding:3px 9px;font-weight:800}
 </style>
 </head>
@@ -367,7 +369,7 @@ function newGame(n0, n1, repeats, first) {
 }
 function rematch() {
   // the player who lost gets to go first next time
-  const g = game; const first = g.winner === null ? g.starter : other(g.winner);
+  const g = game; const first = g.winner === null ? other(g.starter) : other(g.winner);   // after a tie, swap who starts
   newGame(g.names[0], g.names[1], g.repeats, first);
 }
 function lockCode() {
@@ -387,11 +389,15 @@ function submitGuess() {
   const [e, n] = score(g, game.codes[other(p)]);
   game.guesses[p].push({ g, e, n });
   ui.fresh = true; resetEntry();
-  if (e === 4) {
-    game.winner = p; game.phase = 'over';
-    wins[game.names[p]] = (wins[game.names[p]] || 0) + 1; LS.set('cb.wins', wins);
-    game.pending = { win: true, e, n };
-    sfx.result(4, 0); setTimeout(sfx.win, 450);
+  const win = w => { game.winner = w; game.phase = 'over'; wins[game.names[w]] = (wins[game.names[w]] || 0) + 1; LS.set('cb.wins', wins); };
+  if (game.cracked != null) {
+    // this was the last-chance turn
+    if (e === 4) { game.phase = 'over'; game.winner = null; game.draw = true; game.pending = { draw: true, e, n }; sfx.result(4, 0); setTimeout(sfx.win, 450); }
+    else { win(game.cracked); game.pending = { missed: true, e, n }; sfx.result(e, n); }
+  } else if (e === 4 && game.guesses[other(p)].length < game.guesses[p].length) {
+    game.cracked = p; game.pending = { cracked: true, e, n }; sfx.result(4, 0); setTimeout(sfx.turn, 450);
+  } else if (e === 4) {
+    win(p); game.pending = { win: true, e, n }; sfx.result(4, 0); setTimeout(sfx.win, 450);
   } else {
     game.pending = { win: false, e, n }; sfx.result(e, n);
   }
@@ -401,7 +407,7 @@ function passTurn() {
   game.pending = null; ui.tool = 'keys'; ui.otab = 'mine';
   if (game.phase === 'over') { saveGame(); ui.view = 'game'; render(); confetti(); return; }
   game.turn = other(game.turn); saveGame(); render();
-  showBanner(esc(game.names[game.turn]) + "'s turn", pColor(game.turn));
+  showBanner(game.cracked != null ? `Last chance, ${esc(game.names[game.turn])}!` : esc(game.names[game.turn]) + "'s turn", game.cracked != null ? 'var(--near)' : pColor(game.turn));
 }
 function flash(m, type) {
   ui.msg = m; ui.msgType = type || ''; ui.shake = !type; if (!type) sfx.err(); render(); ui.shake = false;
@@ -614,10 +620,12 @@ function vPlay() {
   let controls;
   if (game.pending) {
     const r = game.pending;
-    controls = r.win
-      ? `<div class="result"><h2 style="color:var(--hit);margin-bottom:6px">Code cracked!</h2>
-          <p class="muted" style="margin:0 0 16px">${nm} broke ${on}'s code in ${plural(b.mine.length, 'guess')}.</p>
-          <button class="btn hit" data-act="pass">See results</button></div>`
+    const card = (title, color, text, btn, cls) => `<div class="result"><h2 style="color:${color};margin-bottom:6px">${title}</h2>
+          <p class="muted" style="margin:0 0 16px">${text}</p><button class="btn ${cls}" data-act="pass">${btn}</button></div>`;
+    controls = r.win ? card('Code cracked!', 'var(--hit)', `${nm} broke ${on}'s code in ${plural(b.mine.length, 'guess')}.`, 'See results', 'hit')
+      : r.cracked ? card('Code cracked!', 'var(--hit)', `${on} hasn't had as many turns, so they get <b style="color:var(--text)">one last turn</b> to tie.`, `Pass to ${on} — last chance`, 'primary')
+      : r.draw ? card("Cracked it too — it's a tie!", 'var(--near)', `${nm} matched ${on} on the very last turn.`, 'See results', 'hit')
+      : r.missed ? card(`Not quite — ${on} wins`, 'var(--danger)', `${r.e} right spot, ${r.n} wrong spot on the last chance.`, 'See results', 'primary')
       : `<div class="result"><div class="big">
             <div><strong style="color:var(--hit)">${r.e}</strong>right spot</div>
             <div><strong style="color:var(--near)">${r.n}</strong>wrong spot</div></div>
@@ -628,7 +636,7 @@ function vPlay() {
     <div class="topbar"><button class="iconbtn" data-act="menu">≡</button>
       <div class="t"><h2><span style="color:${pColor(p)}">${nm}</span>'s turn</h2><div>Guess #${b.mine.length + (game.pending ? 0 : 1)} · cracking ${on}'s code</div></div>
       <button class="peek" id="peek">My code</button></div>
-    <div class="opp"><span><b style="color:${pColor(o)}">${on}</b> has made ${plural(b.theirs.length, 'guess')} on your code</span>${b.theirs.length ? `<span class="muted">best</span>${pegs(best.e, best.n)}` : ''}</div>
+    ${game.cracked != null && game.cracked !== p && !game.pending ? lastChanceBar(on, 'your') : `<div class="opp"><span><b style="color:${pColor(o)}">${on}</b> has made ${plural(b.theirs.length, 'guess')} on your code</span>${b.theirs.length ? `<span class="muted">best</span>${pegs(best.e, best.n)}` : ''}</div>`}
     <div class="play">
       <div class="left">${localHistory(b, fresh)}${assistHtml(b)}</div>
       <div class="controls">${controls}</div>
@@ -642,13 +650,27 @@ function localHistory(b, fresh) {
   return historyHtml(b.mine, fresh, 'Enter 4 digits below and tap Guess.', tabs, { notes: b.notes, pane: notes ? notesPane(b) : '' });
 }
 function vOver() {
-  const w = game.winner, l = other(w);
   const w0 = wins[game.names[0]] || 0, w1 = wins[game.names[1]] || 0;
+  if (game.winner === null) {
+    const firstUp = other(game.starter);
+    return `<div class="screen center scroll">
+    <div class="trophy">🤝</div>
+    <h1 style="font-size:clamp(26px,7vw,40px)">It's a tie!</h1>
+    <p class="muted" style="margin:8px 0 0">Both players cracked the code in ${plural(game.guesses[0].length, 'guess')}.</p>
+    ${codesCards(game.names, game.codes)}
+    <div class="score">${esc(game.names[0])}<b>${w0}</b>–<b>${w1}</b>${esc(game.names[1])}</div>
+    <div class="stack">
+      <button class="btn primary" data-act="rematch">Rematch (${esc(game.names[firstUp])} goes first)</button>
+      <button class="btn" data-act="review">Review both boards</button>
+      <button class="btn" data-act="home">Home</button>
+    </div></div>`;
+  }
+  const w = game.winner, l = other(w);
   return `<div class="screen center scroll">
     <div class="trophy">🏆</div>
     <h1 style="font-size:clamp(26px,7vw,40px)"><span style="color:${pColor(w)}">${esc(game.names[w])}</span> wins!</h1>
     <p class="muted" style="margin:8px 0 0">Cracked the code in ${plural(game.guesses[w].length, 'guess')}.
-      ${esc(game.names[l])} made ${game.guesses[l].length}.</p>
+      ${game.cracked != null ? `${esc(game.names[l])} missed the last chance.` : `${esc(game.names[l])} made ${game.guesses[l].length}.`}</p>
     ${codesCards(game.names, game.codes)}
     <div class="score">${esc(game.names[0])}<b>${w0}</b>–<b>${w1}</b>${esc(game.names[1])}</div>
     <div class="stack">
@@ -657,6 +679,8 @@ function vOver() {
       <button class="btn" data-act="home">Home</button>
     </div></div>`;
 }
+// fair finish: if the first player cracks the code, the other player gets one last turn to tie
+const lastChanceBar = (who, them) => `<div class="opp lastchance">⚡ <span><b>${who}</b> cracked ${them} code! <b>Last chance</b> — crack it now to tie.</span></div>`;
 function codesCards(nms, codes) {
   const lab = n => n === 'You' ? 'Your code' : `${esc(n)}'s code`;
   return `<div class="codes">
@@ -690,7 +714,8 @@ function vRules() {
       <div class="example"><div class="row"><span class="n">1</span><div class="d"><span>4</span><span>5</span><span>9</span><span>2</span></div>${pegs(1, 1)}</div></div>
       <p>The 5 is right and in the right spot (●). The 9 is in the code but in the wrong spot (○). You see one of each — not which digit is which.</p></div>
     <div class="card"><h3>3. First to crack it wins</h3>
-      <p>All your past guesses and their icons stay listed on your turn. Use them to narrow it down. The first player to guess the full code wins.</p></div>
+      <p>All your past guesses and their icons stay listed on your turn. Use them to narrow it down. The first player to guess the full code wins.</p>
+      <p><b>Fair finish:</b> if the player who went first cracks the code, the other player gets <b>one last turn</b> — so both have had the same number of guesses. Crack it too and it's a <b>tie</b>.</p></div>
     <div class="card"><h3>Three ways to play</h3>
       <p><b>Pass the phone:</b> both players share one phone. The game hides each code while you hand it over.</p>
       <p><b>Vs the computer:</b> pick Easy, Normal or Hard. Easy forgets some of its clues; Normal plays like a sharp human; Hard picks the guess that rules out the most possibilities every turn.</p>
@@ -834,8 +859,9 @@ function statusText(x) {
   switch (x.status) {
     case 'waiting': return ['Waiting for someone to join', `Code ${x.join_code}`, ''];
     case 'codes': return x.my_code_set ? [opp, `Waiting for their code`, 'Their turn'] : [opp, 'New game — pick your code', 'Your turn'];
-    case 'play': return [opp, `${x.moves} guess${x.moves === 1 ? '' : 'es'} so far`, x.turn === x.me ? 'Your turn' : 'Their turn'];
-    default: return [opp, x.winner === x.me ? 'You won' : `${opp} won`, x.winner === x.me ? '🏆' : ''];
+    case 'play': return [opp, x.cracked != null ? (x.cracked === x.me ? 'You cracked it — their last chance' : 'They cracked your code!') : `${x.moves} guess${x.moves === 1 ? '' : 'es'} so far`,
+      x.turn === x.me ? (x.cracked != null ? 'Last chance!' : 'Your turn') : 'Their turn'];
+    default: return [opp, x.draw ? 'Tie game' : x.winner === x.me ? 'You won' : `${opp} won`, x.draw ? '🤝' : x.winner === x.me ? '🏆' : ''];
   }
 }
 function vOnline() {
@@ -941,7 +967,7 @@ function vOPlay(st, top) {
     controls = `${noting ? `<button class="btn narrowonly backbar" data-act="otab" data-v="mine">Back to my guesses</button>` : ''}<div class="result ${noting ? 'wideonly' : ''}">
         ${last ? `<div class="muted" style="font-size:14px">Your guess <b class="mono" style="color:var(--text)">${last.g}</b></div>
           <div class="big" style="margin-bottom:4px"><div><strong style="color:var(--hit)">${last.e}</strong>right spot</div><div><strong style="color:var(--near)">${last.n}</strong>wrong spot</div></div>` : ''}
-        <div class="waiting"><span class="spin"></span>${opp}'s turn to guess…</div>
+        <div class="waiting"><span class="spin"></span>${st.cracked === st.me ? `🎉 You cracked it! ${opp} gets one last turn to tie…` : `${opp}'s turn to guess…`}</div>
         <div class="muted" style="font-size:13px">${ui.pushOk ? "We'll buzz you when it's your move." : "You can leave — your game is saved."}</div></div>
       <div class="wideonly">${notesHead}<div class="notes">${t.chips}</div>
       <div class="toolhead"><span>Spot grid</span></div>${t.grid}</div>
@@ -952,22 +978,24 @@ function vOPlay(st, top) {
     <div class="topbar"><button class="iconbtn" data-act="olist">‹</button>
       <div class="t"><h2>${myTurn ? '<span style="color:var(--hit)">Your turn</span>' : `${opp}'s turn`}</h2><div>Cracking ${opp}'s code · ${myTurn ? `guess #${b.mine.length + 1}` : `${plural(b.mine.length, 'guess')} so far`}</div></div>
       <button class="iconbtn" data-act="omenu">≡</button><button class="peek" id="peek" style="min-width:84px">My code</button></div>
-    <button class="opp tap" data-act="otab" data-v="theirs" style="width:100%;text-align:left"><span><b style="color:var(--p1)">${opp}</b> has made ${plural(b.theirs.length, 'guess')} on your code</span>${b.theirs.length ? `<span class="muted">best</span>${pegs(best.e, best.n)}` : ''}</button>
+    ${st.cracked != null && st.cracked !== st.me && myTurn ? lastChanceBar(opp, 'your') : `<button class="opp tap" data-act="otab" data-v="theirs" style="width:100%;text-align:left"><span><b style="color:var(--p1)">${opp}</b> has made ${plural(b.theirs.length, 'guess')} on your code</span>${b.theirs.length ? `<span class="muted">best</span>${pegs(best.e, best.n)}` : ''}</button>`}
     <div class="play">
       <div class="left">${hist}${theirs ? '' : assistHtml(b)}</div>
       <div class="controls">${controls}</div>
     </div></div>`;
 }
 function vOOver(st) {
-  const won = st.winner === st.me, opp = esc(oppName());
+  const won = st.winner === st.me, tie = st.draw, opp = esc(oppName());
   const mine = st.guesses.filter(x => x.p === st.me).length, theirs = st.guesses.length - mine;
   const codes = st.me === 0 ? [st.my_code, st.their_code] : [st.their_code, st.my_code];
   let line;
   if (st.resigned) line = won ? `${opp} gave up.` : 'You gave up.';
+  else if (tie) line = `You both cracked the code in ${plural(mine, 'guess')}.`;
+  else if (st.cracked != null) line = won ? `You cracked ${opp}'s code in ${plural(mine, 'guess')}, and their last chance missed.` : `${opp} cracked your code in ${plural(theirs, 'guess')}, and your last chance missed.`;
   else line = won ? `You cracked ${opp}'s code in ${plural(mine, 'guess')}. ${opp} made ${theirs}.` : `${opp} cracked your code in ${plural(theirs, 'guess')}. You made ${mine}.`;
   return `<div class="screen center scroll">
-    <div class="trophy">${won ? '🏆' : '🔓'}</div>
-    <h1 style="font-size:clamp(26px,7vw,40px)">${won ? '<span style="color:var(--hit)">You win!</span>' : `${opp} wins`}</h1>
+    <div class="trophy">${tie ? '🤝' : won ? '🏆' : '🔓'}</div>
+    <h1 style="font-size:clamp(26px,7vw,40px)">${tie ? "It's a tie!" : won ? '<span style="color:var(--hit)">You win!</span>' : `${opp} wins`}</h1>
     <p class="muted" style="margin:8px 0 0">${line}</p>
     ${codesCards(st.names, codes)}
     <div class="stack">
@@ -1002,9 +1030,12 @@ async function loadGame(quiet) {
     ui.og = st; ui.oerr = '';
     if (!changed) return;
     if (prev && prev.id === st.id && !quiet) {
-      if (st.status === 'over' && prev.status !== 'over') { if (st.winner === st.me) { sfx.win(); confetti(); } else sfx.lose(); }
-      else if (st.status === 'play' && st.turn === st.me && (prev.turn !== st.me || prev.status !== 'play')) {
-        sfx.turn(); showBanner(prev.status === 'play' ? 'Your turn!' : "Game on — you're first!", 'var(--hit)');
+      if (st.status === 'over' && prev.status !== 'over') {
+        if (st.draw) { sfx.turn(); showBanner("It's a tie!", 'var(--near)'); } else if (st.winner === st.me) { sfx.win(); confetti(); } else sfx.lose();
+      } else if (st.status === 'play' && st.turn === st.me && (prev.turn !== st.me || prev.status !== 'play')) {
+        sfx.turn();
+        if (st.cracked != null && st.cracked !== st.me) showBanner('Last chance!', 'var(--near)');
+        else showBanner(prev.status === 'play' ? 'Your turn!' : "Game on — you're first!", 'var(--hit)');
       } else if (prev.status === 'waiting' && st.status !== 'waiting') { sfx.turn(); showBanner(`${esc(oppName())} joined!`, 'var(--p1)'); }
     }
     render();
@@ -1040,7 +1071,11 @@ function oGuess() {
   withBusy(async () => {
     const r = await rpc('cb_guess', { p_secret: me.secret, p_game: st.id, p_guess: g });
     notify(st.id, 'guess'); resetEntry(); ui.fresh = true; ui.otab = 'mine';
-    if (r.over) { sfx.result(4, 0); setTimeout(sfx.win, 450); setTimeout(confetti, 300); } else sfx.result(r.exact, r.near);
+    sfx.result(r.exact, r.near);
+    if (r.cracked) { setTimeout(sfx.turn, 450); setTimeout(() => showBanner(`Cracked! ${esc(oppName())} gets one last turn`, 'var(--hit)'), 300); }
+    else if (r.over && r.draw) setTimeout(() => showBanner("It's a tie!", 'var(--near)'), 300);
+    else if (r.over && r.exact === 4) { setTimeout(sfx.win, 450); setTimeout(confetti, 300); }
+    else if (r.over) setTimeout(sfx.lose, 450);
     ui.busy = false; await loadGame(true); loadList();
   });
 }
@@ -1122,8 +1157,10 @@ function aiNewGame(level, repeats, first) {
 const aiMyName = () => (me && me.name) || (names[0] && names[0] !== 'Player 1' ? names[0] : 'You');
 function aiRecordFor(level) { return aiRecord[level] || { w: 0, l: 0 }; }
 function aiFinish(winner) {
-  ai.phase = 'over'; ai.winner = winner;
-  const r = aiRecordFor(ai.level); if (winner === 0) r.w++; else r.l++; aiRecord[ai.level] = r; LS.set('cb.aiwins', aiRecord);
+  ai.phase = 'over'; ai.winner = winner; ai.draw = winner === null;
+  const r = aiRecordFor(ai.level);
+  if (winner === null) r.d = (r.d || 0) + 1; else if (winner === 0) r.w++; else r.l++;
+  aiRecord[ai.level] = r; LS.set('cb.aiwins', aiRecord);
 }
 function aiLock() {
   const c = entryStr(); if (!c) return;
@@ -1136,7 +1173,13 @@ function aiGuess() {
   if (ai.guesses[0].some(x => x.g === g)) { flash('You already guessed ' + g + '.'); return; }
   const [e, n] = score(g, ai.codes[1]);
   ai.guesses[0].push({ g, e, n }); ui.fresh = true; resetEntry(); ui.otab = 'mine';
-  if (e === 4) { aiFinish(0); sfx.result(4, 0); setTimeout(sfx.win, 450); setTimeout(confetti, 300); }
+  if (ai.cracked === 1) {
+    // your last-chance turn after the computer cracked your code
+    if (e === 4) { aiFinish(null); sfx.result(4, 0); setTimeout(sfx.win, 450); } else { aiFinish(1); sfx.result(e, n); setTimeout(sfx.lose, 450); }
+  } else if (e === 4 && ai.guesses[1].length < ai.guesses[0].length) {
+    ai.cracked = 0; ai.turn = 1; sfx.result(4, 0); setTimeout(sfx.turn, 450);
+    setTimeout(() => showBanner('Cracked! Computer gets one last turn', 'var(--hit)'), 300);
+  } else if (e === 4) { aiFinish(0); sfx.result(4, 0); setTimeout(sfx.win, 450); setTimeout(confetti, 300); }
   else { ai.turn = 1; sfx.result(e, n); }
   saveAi(); render();
 }
@@ -1149,9 +1192,19 @@ function aiScheduleMove() {
     const g = aiPickGuess(ai.level, ai.guesses[1], ai.repeats);
     const [e, n] = score(g, ai.codes[0]);
     ai.guesses[1].push({ g, e, n });
-    if (e === 4) { aiFinish(1); saveAi(); if (ui.view === 'aGame') { render(); sfx.lose(); } return; }
+    const show = (fx, text, color) => { if (ui.view === 'aGame') { render(); fx(); if (text) showBanner(text, color); } };
+    if (ai.cracked === 0) {
+      // the computer's last-chance turn after you cracked its code
+      aiFinish(e === 4 ? null : 0); saveAi();
+      return show(e === 4 ? sfx.turn : () => { sfx.win(); confetti(); }, e === 4 ? 'Computer tied it!' : '', 'var(--near)');
+    }
+    if (e === 4 && ai.guesses[0].length < ai.guesses[1].length) {
+      ai.cracked = 1; ai.turn = 0; saveAi();
+      return show(sfx.turn, 'Last chance!', 'var(--near)');
+    }
+    if (e === 4) { aiFinish(1); saveAi(); return show(sfx.lose); }
     ai.turn = 0; saveAi();
-    if (ui.view === 'aGame') { render(); sfx.turn(); showBanner(`Computer guessed ${g}`, 'var(--p1)'); }
+    show(sfx.turn, `Computer guessed ${g}`, 'var(--p1)');
   }, 1300 + Math.random() * 900);
 }
 function vANew() {
@@ -1164,7 +1217,7 @@ function vANew() {
     <div class="pagehead"><button class="iconbtn" data-act="home">‹</button><h2>Play the computer</h2></div>
     <div class="field"><label>Difficulty</label>
       <div class="seg" style="margin:0">${Object.keys(LEVELS).map(k => `<button data-act="alevel" data-v="${k}" class="${lv === k ? 'on' : ''}">${LEVELS[k]}</button>`).join('')}</div>
-      <small class="muted" style="line-height:1.45;font-size:13px">${desc[lv]}${rec.w + rec.l ? ` Your record on ${LEVELS[lv]}: <b style="color:var(--text)">${rec.w} won, ${rec.l} lost</b>.` : ''}</small></div>
+      <small class="muted" style="line-height:1.45;font-size:13px">${desc[lv]}${rec.w + rec.l + (rec.d || 0) ? ` Your record on ${LEVELS[lv]}: <b style="color:var(--text)">${rec.w} won, ${rec.l} lost${rec.d ? `, ${rec.d} tied` : ''}</b>.` : ''}</small></div>
     ${repeatsOpt('toggleNewRep')}
     <div class="field"><label>Who guesses first?</label>
       <div class="seg" style="margin:0">
@@ -1198,7 +1251,7 @@ function vAGame() {
     controls = `${noting ? `<button class="btn narrowonly backbar" data-act="otab" data-v="mine">Back to my guesses</button>` : ''}<div class="result ${noting ? 'wideonly' : ''}">
         ${last ? `<div class="muted" style="font-size:14px">Your guess <b class="mono" style="color:var(--text)">${last.g}</b></div>
           <div class="big" style="margin-bottom:4px"><div><strong style="color:var(--hit)">${last.e}</strong>right spot</div><div><strong style="color:var(--near)">${last.n}</strong>wrong spot</div></div>` : ''}
-        <div class="waiting"><span class="spin"></span>The computer is thinking…</div></div>
+        <div class="waiting"><span class="spin"></span>${ai.cracked === 0 ? '🎉 You cracked it! The computer gets one last turn to tie…' : 'The computer is thinking…'}</div></div>
       <div class="wideonly">${notesHead}<div class="notes">${t.chips}</div><div class="toolhead"><span>Spot grid</span></div>${t.grid}</div>`;
   }
   const lastTheirs = b.theirs[b.theirs.length - 1];
@@ -1206,21 +1259,23 @@ function vAGame() {
     <div class="topbar"><button class="iconbtn" data-act="amenu">≡</button>
       <div class="t"><h2>${myTurn ? '<span style="color:var(--hit)">Your turn</span>' : "Computer's turn"}</h2><div>vs Computer · ${LEVELS[ai.level]} · ${myTurn ? `guess #${b.mine.length + 1}` : `${plural(b.mine.length, 'guess')} so far`}</div></div>
       <button class="peek" id="peek">My code</button></div>
-    <button class="opp tap" data-act="otab" data-v="theirs" style="width:100%;text-align:left"><span><b style="color:var(--p1)">Computer</b> ${lastTheirs ? `last guessed <b class="mono">${lastTheirs.g}</b> on your code` : "hasn't guessed yet"}</span>${lastTheirs ? pegs(lastTheirs.e, lastTheirs.n) : ''}</button>
+    ${ai.cracked === 1 && myTurn ? lastChanceBar('The computer', 'your') : `<button class="opp tap" data-act="otab" data-v="theirs" style="width:100%;text-align:left"><span><b style="color:var(--p1)">Computer</b> ${lastTheirs ? `last guessed <b class="mono">${lastTheirs.g}</b> on your code` : "hasn't guessed yet"}</span>${lastTheirs ? pegs(lastTheirs.e, lastTheirs.n) : ''}</button>`}
     <div class="play">
       <div class="left">${hist}${theirs ? '' : assistHtml(b)}</div>
       <div class="controls">${controls}</div>
     </div></div>`;
 }
 function vAOver() {
-  const won = ai.winner === 0, mine = ai.guesses[0].length, theirs = ai.guesses[1].length, rec = aiRecordFor(ai.level);
-  const line = ai.resigned ? 'You gave up.' : won ? `You cracked its code in ${plural(mine, 'guess')}. The computer made ${theirs}.` : `The computer cracked your code in ${plural(theirs, 'guess')}. You made ${mine}.`;
+  const won = ai.winner === 0, tie = ai.winner === null, mine = ai.guesses[0].length, theirs = ai.guesses[1].length, rec = aiRecordFor(ai.level);
+  const line = ai.resigned ? 'You gave up.' : tie ? `You both cracked the code in ${plural(mine, 'guess')}.`
+    : won ? (ai.cracked === 0 ? `You cracked its code in ${plural(mine, 'guess')}, and it missed its last chance.` : `You cracked its code in ${plural(mine, 'guess')}. The computer made ${theirs}.`)
+    : (ai.cracked === 1 ? `The computer cracked your code in ${plural(theirs, 'guess')}, and your last chance missed.` : `The computer cracked your code in ${plural(theirs, 'guess')}. You made ${mine}.`);
   return `<div class="screen center scroll">
-    <div class="trophy">${won ? '🏆' : '🤖'}</div>
-    <h1 style="font-size:clamp(26px,7vw,40px)">${won ? '<span style="color:var(--hit)">You win!</span>' : 'The computer wins'}</h1>
+    <div class="trophy">${tie ? '🤝' : won ? '🏆' : '🤖'}</div>
+    <h1 style="font-size:clamp(26px,7vw,40px)">${tie ? "It's a tie!" : won ? '<span style="color:var(--hit)">You win!</span>' : 'The computer wins'}</h1>
     <p class="muted" style="margin:8px 0 0">${line}</p>
     ${codesCards(ai.names, ai.codes)}
-    <div class="score">${LEVELS[ai.level]} record: <b>${rec.w}</b>won · <b>${rec.l}</b>lost</div>
+    <div class="score">${LEVELS[ai.level]} record: <b>${rec.w}</b>won · <b>${rec.l}</b>lost${rec.d ? ` · <b>${rec.d}</b>tied` : ''}</div>
     <div class="stack">
       <button class="btn primary" data-act="arematch">Play again (${LEVELS[ai.level]})</button>
       <button class="btn" data-act="anew">Change difficulty</button>
@@ -1352,7 +1407,7 @@ function act(a, d) {
     case 'amenu': ui.sheet = 'amenu'; break;
     case 'aresign': ui.sheet = 'aresign'; break;
     case 'aresignyes': ai.resigned = true; aiFinish(1); saveAi(); ui.sheet = null; sfx.lose(); break;
-    case 'arematch': aiNewGame(ai.level, ai.repeats, ai.winner === 0 ? 1 : 0); return;
+    case 'arematch': aiNewGame(ai.level, ai.repeats, ai.winner === null ? other(ai.starter) : ai.winner === 0 ? 1 : 0); return;
     case 'anew': ui.view = 'aNew'; ui.first = 0; break;
     case 'areview': ui.view = 'aReview'; break;
     case 'aback': ui.view = 'aGame'; break;
