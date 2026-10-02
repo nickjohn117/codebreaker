@@ -30,7 +30,7 @@ body{touch-action:manipulation}
   padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
 .screen{flex:1;min-height:0;display:flex;flex-direction:column;width:100%;max-width:1100px;margin:0 auto;padding:14px 16px}
 .scroll{overflow-y:auto;-webkit-overflow-scrolling:touch}
-.center{align-items:center;justify-content:center;text-align:center}
+.center{align-items:center;justify-content:center;justify-content:safe center;text-align:center}
 h1,h2,h3{margin:0}
 .muted{color:var(--muted)}
 .mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
@@ -249,6 +249,21 @@ h1,h2,h3{margin:0}
 .opp.tap{cursor:pointer}
 .opp.lastchance{background:rgba(255,181,71,.12);border-color:var(--near);color:var(--text)}
 .opp.lastchance b{color:var(--near)}
+.stiles{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+@media (min-width:720px){.stiles{grid-template-columns:repeat(4,1fr)}}
+.stile{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:2px}
+.stile b{font:800 24px var(--mono)}
+.stile span{font-size:12px;color:var(--muted)}
+.slist{display:flex;flex-direction:column;gap:6px}
+.srow{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.srow > div{flex:1;min-width:0}
+.srow b{display:block;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.srow small{color:var(--muted);font-size:12px}
+.srow .when{flex:none;min-width:58px;text-align:right}
+.wl{display:flex;width:84px;height:8px;border-radius:4px;overflow:hidden;background:var(--panel2);flex:none}
+.wl i{display:block}
+.clock{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.countdown{font:800 96px/1.1 var(--mono);color:var(--hit);margin:6px 0}
 .homebadge{background:var(--hit);color:#03170e;border-radius:99px;font-size:12px;padding:3px 9px;font-weight:800}
 </style>
 </head>
@@ -359,18 +374,55 @@ const sfx = {
 };
 
 /* ================= pass-the-phone game ================= */
-function newGame(n0, n1, repeats, first) {
+/* ---------- modes, clocks, history ---------- */
+const MODES = {
+  classic: { name: 'Classic', desc: 'Take turns. First to crack the code wins — and if the player who went first cracks it, the other gets one last turn to tie.' },
+  playout: { name: 'Play it out', desc: "Take turns until you've both cracked the code. Fewest guesses wins; the same number is a tie." },
+  race: { name: 'Race', desc: 'No turns — you both guess at the same time with the clock running. First to crack the code wins.' },
+  trial: { name: 'Time trial', desc: "Each player solves the other's code in turn with the clock running. Fastest time wins; fewer guesses breaks a tie." }
+};
+function modePicker(act, keys, cur) {
+  return `<div class="field"><label>Mode</label>
+    <div class="seg" style="margin:0">${keys.map(k => `<button data-act="${act}" data-v="${k}" class="${cur === k ? 'on' : ''}">${MODES[k].name}</button>`).join('')}</div>
+    <small class="muted" style="line-height:1.45;font-size:13px">${MODES[cur].desc}</small></div>`;
+}
+const fmtTime = ms => {
+  if (ms == null || !isFinite(ms)) return '—';
+  const t = Math.max(0, ms), m = Math.floor(t / 60000), sec = Math.floor(t / 1000) % 60, d = Math.floor(t / 100) % 10;
+  return `${m}:${String(sec).padStart(2, '0')}.${d}`;
+};
+// clocks are updated in place by a ticker, so the screen doesn't re-render every tenth of a second
+const clockHtml = (start, end, off) => `<span class="clock" data-start="${start}" data-off="${off || 0}" ${end ? `data-end="${end}"` : ''}>${fmtTime((end || (Date.now() + (off || 0))) - start)}</span>`;
+const countdownHtml = (at, off) => `<div class="countdown" data-at="${at}" data-off="${off || 0}">${Math.min(3, Math.max(1, Math.ceil((at - Date.now() - (off || 0)) / 1000)))}</div>`;
+setInterval(() => {
+  document.querySelectorAll('.clock').forEach(el => {
+    const now = Date.now() + (+el.dataset.off || 0);
+    el.textContent = fmtTime((el.dataset.end ? +el.dataset.end : now) - +el.dataset.start);
+  });
+  document.querySelectorAll('.countdown').forEach(el => {
+    const left = +el.dataset.at - (Date.now() + (+el.dataset.off || 0));
+    if (left > 0) el.textContent = Math.min(3, Math.ceil(left / 1000));
+    else if (!el.dataset.fired) { el.dataset.fired = '1'; el.textContent = 'GO!'; sfx.turn(); setTimeout(render, 350); }
+  });
+}, 100);
+let gameLog = LS.get('cb.history', []);
+function recordGame(r) { r.t = Date.now(); gameLog.unshift(r); gameLog = gameLog.slice(0, 500); LS.set('cb.history', gameLog); }
+
+/* ================= pass-the-phone game ================= */
+function newGame(n0, n1, repeats, first, mode) {
   names = [n0, n1]; LS.set('cb.names', names);
-  settings.repeats = repeats; saveSettings();
+  mode = mode || 'classic';
+  settings.repeats = repeats; settings.ptpMode = mode; saveSettings();
   const starter = first === 2 ? (Math.random() < 0.5 ? 0 : 1) : first;
-  game = { v: 1, names: [n0, n1], repeats, starter, turn: starter, phase: 'cover', cover: { p: 0, then: 'code' },
-    codes: ['', ''], guesses: [[], []], notes: [mkNotes(), mkNotes()], winner: null, pending: null };
+  game = { v: 1, mode, names: [n0, n1], repeats, starter, turn: starter, phase: 'cover', cover: { p: 0, then: 'code' },
+    codes: ['', ''], guesses: [[], []], notes: [mkNotes(), mkNotes()], winner: null, pending: null,
+    done: [null, null], time: [null, null], t0: [null, null] };
   saveGame(); resetEntry(); ui.otab = 'mine'; ui.view = 'game'; render();
 }
 function rematch() {
-  // the player who lost gets to go first next time
-  const g = game; const first = g.winner === null ? other(g.starter) : other(g.winner);   // after a tie, swap who starts
-  newGame(g.names[0], g.names[1], g.repeats, first);
+  // the player who lost gets to go first next time; after a tie, swap who starts
+  const g = game; const first = g.winner === null ? other(g.starter) : other(g.winner);
+  newGame(g.names[0], g.names[1], g.repeats, first, g.mode);
 }
 function lockCode() {
   const c = entryStr();
@@ -379,8 +431,23 @@ function lockCode() {
   const p = game.cover.p;
   game.codes[p] = c; sfx.lock();
   if (p === 0) game.cover = { p: 1, then: 'code' };
-  else game.cover = { p: game.starter, then: 'play' };
+  else game.cover = { p: game.starter, then: game.mode === 'trial' ? 'solve' : 'play' };
   game.phase = 'cover'; saveGame(); resetEntry(); render();
+}
+function finishLocal(w, pending) {
+  game.phase = 'over'; game.winner = w; game.draw = w === null; game.pending = pending;
+  if (w !== null) { wins[game.names[w]] = (wins[game.names[w]] || 0) + 1; LS.set('cb.wins', wins); }
+  recordGame({ kind: 'local', mode: game.mode || 'classic', names: game.names.slice(), winner: w === null ? null : game.names[w],
+    counts: [game.guesses[0].length, game.guesses[1].length], ms: game.mode === 'trial' ? game.time.slice() : null });
+}
+// fewer guesses wins (play it out); faster time, then fewer guesses (time trial)
+function decideLocal() {
+  const [a, b] = game.done;
+  if (game.mode === 'trial') {
+    const [ta, tb] = game.time;
+    if (ta !== tb) return ta < tb ? 0 : 1;
+  }
+  return a < b ? 0 : a > b ? 1 : null;
 }
 function submitGuess() {
   const g = entryStr(); const p = game.turn;
@@ -389,25 +456,54 @@ function submitGuess() {
   const [e, n] = score(g, game.codes[other(p)]);
   game.guesses[p].push({ g, e, n });
   ui.fresh = true; resetEntry();
-  const win = w => { game.winner = w; game.phase = 'over'; wins[game.names[w]] = (wins[game.names[w]] || 0) + 1; LS.set('cb.wins', wins); };
-  if (game.cracked != null) {
-    // this was the last-chance turn
-    if (e === 4) { game.phase = 'over'; game.winner = null; game.draw = true; game.pending = { draw: true, e, n }; sfx.result(4, 0); setTimeout(sfx.win, 450); }
-    else { win(game.cracked); game.pending = { missed: true, e, n }; sfx.result(e, n); }
-  } else if (e === 4 && game.guesses[other(p)].length < game.guesses[p].length) {
+  const mode = game.mode || 'classic', cnt = game.guesses[p].length;
+  if (mode === 'trial') {
+    if (e === 4) {
+      game.time[p] = Date.now() - game.t0[p]; game.done[p] = cnt; sfx.result(4, 0);
+      if (game.done[other(p)] == null) { game.pending = { tcracked: true }; setTimeout(sfx.turn, 450); }
+      else { finishLocal(decideLocal(), { final: true }); setTimeout(sfx.win, 450); }
+    } else sfx.result(e, n);          // time trial: keep guessing, no hand-over between guesses
+  } else if (mode === 'playout') {
+    if (e === 4) {
+      game.done[p] = cnt; sfx.result(4, 0);
+      if (game.done[other(p)] == null) { game.pending = { pcracked: true }; setTimeout(sfx.turn, 450); }
+      else { finishLocal(decideLocal(), { final: true }); setTimeout(sfx.win, 450); }
+    } else { game.pending = { win: false, e, n, keep: game.done[other(p)] != null }; sfx.result(e, n); }
+  } else if (game.cracked != null) {
+    // classic: this was the last-chance turn
+    if (e === 4) { finishLocal(null, { draw: true, e, n }); sfx.result(4, 0); setTimeout(sfx.win, 450); }
+    else { finishLocal(game.cracked, { missed: true, e, n }); sfx.result(e, n); }
+  } else if (e === 4 && game.guesses[other(p)].length < cnt) {
     game.cracked = p; game.pending = { cracked: true, e, n }; sfx.result(4, 0); setTimeout(sfx.turn, 450);
   } else if (e === 4) {
-    win(p); game.pending = { win: true, e, n }; sfx.result(4, 0); setTimeout(sfx.win, 450);
+    finishLocal(p, { win: true, e, n }); sfx.result(4, 0); setTimeout(sfx.win, 450);
   } else {
     game.pending = { win: false, e, n }; sfx.result(e, n);
   }
   saveGame(); render();
 }
 function passTurn() {
+  const pend = game.pending || {};
   game.pending = null; ui.tool = 'keys'; ui.otab = 'mine';
   if (game.phase === 'over') { saveGame(); ui.view = 'game'; render(); confetti(); return; }
-  game.turn = other(game.turn); saveGame(); render();
-  showBanner(game.cracked != null ? `Last chance, ${esc(game.names[game.turn])}!` : esc(game.names[game.turn]) + "'s turn", game.cracked != null ? 'var(--near)' : pColor(game.turn));
+  if (pend.tcracked) {             // time trial: the other player now solves
+    game.phase = 'cover'; game.cover = { p: other(game.turn), then: 'solve' }; saveGame(); render(); return;
+  }
+  let next = other(game.turn);
+  if (game.mode === 'playout' && game.done[next] != null) next = game.turn;   // they've finished; you play on
+  const same = next === game.turn;
+  game.turn = next; saveGame(); render();
+  showBanner(same ? `Keep going, ${esc(game.names[next])}!` : game.cracked != null ? `Last chance, ${esc(game.names[next])}!` : esc(game.names[next]) + "'s turn",
+    game.cracked != null ? 'var(--near)' : pColor(next));
+}
+function revealLocal() {
+  // play it out / time trial: stop and take the loss
+  const p = game.turn;
+  if (game.mode === 'trial') { game.time[p] = Infinity; game.done[p] = Infinity; }
+  else game.done[p] = Infinity;
+  if (game.done[other(p)] == null) { game.pending = { tcracked: game.mode === 'trial', pcracked: game.mode === 'playout', gaveup: true }; }
+  else finishLocal(other(p), { final: true });
+  saveGame(); render();
 }
 function flash(m, type) {
   ui.msg = m; ui.msgType = type || ''; ui.shake = !type; if (!type) sfx.err(); render(); ui.shake = false;
@@ -553,7 +649,7 @@ function vHome() {
   const cont = game && (game.phase !== 'over' || game.pending);
   const w0 = wins[names[0]] || 0, w1 = wins[names[1]] || 0;
   const yt = yourTurnCount();
-  return `<div class="screen center">
+  return `<div class="screen center scroll">
     <div class="logopegs pegs" style="--pg:26px"><span class="peg hit"></span><span class="peg near"></span><span class="peg hit"></span><span class="peg"></span></div>
     <div class="logo">CODE<span>BREAKER</span></div>
     <div class="tag muted">Crack their code before they crack yours.</div>
@@ -562,6 +658,7 @@ function vHome() {
       <button class="btn ${cont ? '' : 'primary'}" data-act="new">Pass-the-phone game</button>
       <button class="btn" data-act="online">Play online ${yt ? `<span class="homebadge">${yt} your turn</span>` : ''}</button>
       <button class="btn" data-act="ai">${ai && ai.phase !== 'over' ? `Continue vs computer · ${LEVELS[ai.level]}` : 'Play the computer'}</button>
+      <button class="btn" data-act="stats">Stats</button>
       <button class="btn" data-act="rules">How to play</button>
       <button class="btn" data-act="settings">Settings</button>
     </div>
@@ -573,10 +670,11 @@ function vNew() {
   const first = ui.first === undefined ? 0 : ui.first;
   return `<div class="screen scroll"><div class="content">
     <div class="pagehead"><button class="iconbtn" data-act="home">‹</button><h2>Pass-the-phone game</h2></div>
+    ${modePicker('ptpmode', ['classic', 'playout', 'trial'], settings.ptpMode || 'classic')}
     <div class="field"><label>Player 1</label><input id="n0" maxlength="14" value="${esc(names[0])}" autocomplete="off"></div>
     <div class="field"><label>Player 2</label><input id="n1" maxlength="14" value="${esc(names[1])}" autocomplete="off"></div>
     ${repeatsOpt('toggleNewRep')}
-    <div class="field"><label>Who guesses first?</label>
+    <div class="field"><label>${(settings.ptpMode || 'classic') === 'trial' ? 'Who solves first?' : 'Who guesses first?'}</label>
       <div class="seg" style="margin:0">
         <button data-act="first" data-v="0" class="${first === 0 ? 'on' : ''}">Player 1</button>
         <button data-act="first" data-v="1" class="${first === 1 ? 'on' : ''}">Player 2</button>
@@ -596,6 +694,12 @@ function vCover() {
     title = `Pass the phone to ${nm}`;
     text = `${nm}, you're choosing your secret 4-digit code.<br><b style="color:var(--text)">${op}, look away!</b>`;
     btn = `I'm ${nm} — pick my code`;
+  } else if (c.then === 'solve') {
+    const ot = game.time[other(p)];
+    title = `${nm}, ready to solve?`;
+    text = `Pass the phone to ${nm}. The clock starts the moment you tap.` +
+      (ot != null ? `<br><b style="color:var(--text)">Time to beat: ${isFinite(ot) ? `${fmtTime(ot)} (${plural(game.done[other(p)], 'guess')})` : `${op} gave up — any time wins`}</b>` : '');
+    btn = `Start the clock`;
   } else {
     title = `Codes are locked in`;
     text = `${nm} guesses first. Pass the phone to ${nm}.`;
@@ -616,31 +720,50 @@ function vCode() {
 function vPlay() {
   const b = localBoard(), p = b.p, o = other(p), nm = esc(b.names[p]), on = esc(b.names[o]);
   const fresh = ui.fresh; ui.fresh = false;
+  const mode = game.mode || 'classic', od = game.done[o];
   ui.peekCode = b.myCode;
   let controls;
   if (game.pending) {
-    const r = game.pending;
+    const r = game.pending, cnt = b.mine.length;
     const card = (title, color, text, btn, cls) => `<div class="result"><h2 style="color:${color};margin-bottom:6px">${title}</h2>
           <p class="muted" style="margin:0 0 16px">${text}</p><button class="btn ${cls}" data-act="pass">${btn}</button></div>`;
-    controls = r.win ? card('Code cracked!', 'var(--hit)', `${nm} broke ${on}'s code in ${plural(b.mine.length, 'guess')}.`, 'See results', 'hit')
+    controls = r.final ? card(game.winner === null ? "It's a tie!" : `${esc(game.names[game.winner])} wins!`, 'var(--hit)', r.gaveup ? '' : `${nm} cracked it in ${plural(cnt, 'guess')}.`, 'See results', 'hit')
+      : r.gaveup ? card('Gave up', 'var(--danger)', `${on} just needs to crack ${nm}'s code to win.`, `Pass to ${on}`, 'primary')
+      : r.tcracked ? card(`Cracked in ${fmtTime(game.time[p])}!`, 'var(--hit)', `${plural(cnt, 'guess')}. Now ${on} solves ${nm}'s code against the clock.`, `Pass to ${on}`, 'primary')
+      : r.pcracked ? card(`Cracked in ${plural(cnt, 'guess')}!`, 'var(--hit)', `${on} plays on — they need <b style="color:var(--text)">${cnt} or fewer</b> to win (${cnt} ties).`, `Pass to ${on}`, 'primary')
+      : r.win ? card('Code cracked!', 'var(--hit)', `${nm} broke ${on}'s code in ${plural(cnt, 'guess')}.`, 'See results', 'hit')
       : r.cracked ? card('Code cracked!', 'var(--hit)', `${on} hasn't had as many turns, so they get <b style="color:var(--text)">one last turn</b> to tie.`, `Pass to ${on} — last chance`, 'primary')
       : r.draw ? card("Cracked it too — it's a tie!", 'var(--near)', `${nm} matched ${on} on the very last turn.`, 'See results', 'hit')
       : r.missed ? card(`Not quite — ${on} wins`, 'var(--danger)', `${r.e} right spot, ${r.n} wrong spot on the last chance.`, 'See results', 'primary')
       : `<div class="result"><div class="big">
             <div><strong style="color:var(--hit)">${r.e}</strong>right spot</div>
             <div><strong style="color:var(--near)">${r.n}</strong>wrong spot</div></div>
-          <button class="btn primary" data-act="pass">Done — pass to ${on}</button></div>`;
+          <button class="btn primary" data-act="pass">${r.keep ? 'Next guess' : `Done — pass to ${on}`}</button></div>`;
   } else controls = guessControls(b);
   const best = bestOf(b.theirs);
+  let bar;
+  if (mode === 'trial') {
+    const ot = game.time[o];
+    bar = `<div class="opp"><span>⏱ ${clockHtml(game.t0[p])}</span><span class="muted" style="margin-left:auto">${ot != null ? `to beat: <b>${isFinite(ot) ? fmtTime(ot) : '—'}</b>` : 'first to solve'}</span></div>`;
+  } else if (mode === 'playout' && od != null && !game.pending) {
+    bar = playoutBar(on, od, b.mine.length, 'treveal');
+  } else if (game.cracked != null && game.cracked !== p && !game.pending) bar = lastChanceBar(on, 'your');
+  else bar = `<div class="opp"><span><b style="color:${pColor(o)}">${on}</b> has made ${plural(b.theirs.length, 'guess')} on your code</span>${b.theirs.length ? `<span class="muted">best</span>${pegs(best.e, best.n)}` : ''}</div>`;
   return `<div class="screen">
     <div class="topbar"><button class="iconbtn" data-act="menu">≡</button>
-      <div class="t"><h2><span style="color:${pColor(p)}">${nm}</span>'s turn</h2><div>Guess #${b.mine.length + (game.pending ? 0 : 1)} · cracking ${on}'s code</div></div>
+      <div class="t"><h2><span style="color:${pColor(p)}">${nm}</span>${mode === 'trial' ? ' is solving' : "'s turn"}</h2><div>${MODES[mode].name} · guess #${b.mine.length + (game.pending ? 0 : 1)} · cracking ${on}'s code</div></div>
       <button class="peek" id="peek">My code</button></div>
-    ${game.cracked != null && game.cracked !== p && !game.pending ? lastChanceBar(on, 'your') : `<div class="opp"><span><b style="color:${pColor(o)}">${on}</b> has made ${plural(b.theirs.length, 'guess')} on your code</span>${b.theirs.length ? `<span class="muted">best</span>${pegs(best.e, best.n)}` : ''}</div>`}
+    ${bar}
     <div class="play">
       <div class="left">${localHistory(b, fresh)}${assistHtml(b)}</div>
       <div class="controls">${controls}</div>
     </div></div>`;
+}
+// play it out: the other player has cracked your code; you need to match or beat their count
+function playoutBar(who, theirN, myCount, revealAct) {
+  if (!isFinite(theirN)) return `<div class="opp lastchance">🏳️ <span><b>${who}</b> gave up — crack the code in any number of guesses to win.</span></div>`;
+  if (myCount >= theirN) return `<div class="opp lastchance">🏁 <span><b>${who}</b> cracked yours in ${theirN} — they win on guesses. Keep going to finish, or <button data-act="${revealAct}" style="color:var(--near);text-decoration:underline;font-weight:700">reveal the code</button>.</span></div>`;
+  return `<div class="opp lastchance">🏁 <span><b>${who}</b> cracked yours in <b>${theirN}</b>. Crack it in ${theirN - 1 > myCount ? `${theirN - 1} or fewer to win, ${theirN} to tie` : theirN - 1 === myCount ? `your next guess to tie` : ''}.</span></div>`;
 }
 function localHistory(b, fresh) {
   const notes = ui.otab === 'notes' && !game.pending;
@@ -649,32 +772,25 @@ function localHistory(b, fresh) {
     <button data-act="otab" data-v="notes" class="${notes ? 'on' : ''}">📝 Notes</button></div>`;
   return historyHtml(b.mine, fresh, 'Enter 4 digits below and tap Guess.', tabs, { notes: b.notes, pane: notes ? notesPane(b) : '' });
 }
+function localOverLine() {
+  const n = game.names.map(esc), mode = game.mode || 'classic';
+  if (mode === 'trial') return game.time.map((t, i) => `${n[i]}: ${isFinite(t) ? `${fmtTime(t)} (${plural(game.done[i], 'guess')})` : 'gave up'}`).join(' · ');
+  if (mode === 'playout') return game.done.map((d, i) => `${n[i]}: ${isFinite(d) ? plural(d, 'guess') : 'gave up'}`).join(' · ');
+  if (game.winner === null) return `Both players cracked the code in ${plural(game.guesses[0].length, 'guess')}.`;
+  const w = game.winner, l = other(w);
+  return `Cracked the code in ${plural(game.guesses[w].length, 'guess')}. ` + (game.cracked != null ? `${n[l]} missed the last chance.` : `${n[l]} made ${game.guesses[l].length}.`);
+}
 function vOver() {
-  const w0 = wins[game.names[0]] || 0, w1 = wins[game.names[1]] || 0;
-  if (game.winner === null) {
-    const firstUp = other(game.starter);
-    return `<div class="screen center scroll">
-    <div class="trophy">🤝</div>
-    <h1 style="font-size:clamp(26px,7vw,40px)">It's a tie!</h1>
-    <p class="muted" style="margin:8px 0 0">Both players cracked the code in ${plural(game.guesses[0].length, 'guess')}.</p>
+  const w0 = wins[game.names[0]] || 0, w1 = wins[game.names[1]] || 0, tie = game.winner === null;
+  const firstUp = tie ? other(game.starter) : other(game.winner);
+  return `<div class="screen center scroll">
+    <div class="trophy">${tie ? '🤝' : '🏆'}</div>
+    <h1 style="font-size:clamp(26px,7vw,40px)">${tie ? "It's a tie!" : `<span style="color:${pColor(game.winner)}">${esc(game.names[game.winner])}</span> wins!`}</h1>
+    <p class="muted" style="margin:8px 0 0">${localOverLine()}</p>
     ${codesCards(game.names, game.codes)}
     <div class="score">${esc(game.names[0])}<b>${w0}</b>–<b>${w1}</b>${esc(game.names[1])}</div>
     <div class="stack">
       <button class="btn primary" data-act="rematch">Rematch (${esc(game.names[firstUp])} goes first)</button>
-      <button class="btn" data-act="review">Review both boards</button>
-      <button class="btn" data-act="home">Home</button>
-    </div></div>`;
-  }
-  const w = game.winner, l = other(w);
-  return `<div class="screen center scroll">
-    <div class="trophy">🏆</div>
-    <h1 style="font-size:clamp(26px,7vw,40px)"><span style="color:${pColor(w)}">${esc(game.names[w])}</span> wins!</h1>
-    <p class="muted" style="margin:8px 0 0">Cracked the code in ${plural(game.guesses[w].length, 'guess')}.
-      ${game.cracked != null ? `${esc(game.names[l])} missed the last chance.` : `${esc(game.names[l])} made ${game.guesses[l].length}.`}</p>
-    ${codesCards(game.names, game.codes)}
-    <div class="score">${esc(game.names[0])}<b>${w0}</b>–<b>${w1}</b>${esc(game.names[1])}</div>
-    <div class="stack">
-      <button class="btn primary" data-act="rematch">Rematch (${esc(game.names[l])} goes first)</button>
       <button class="btn" data-act="review">Review both boards</button>
       <button class="btn" data-act="home">Home</button>
     </div></div>`;
@@ -716,6 +832,11 @@ function vRules() {
     <div class="card"><h3>3. First to crack it wins</h3>
       <p>All your past guesses and their icons stay listed on your turn. Use them to narrow it down. The first player to guess the full code wins.</p>
       <p><b>Fair finish:</b> if the player who went first cracks the code, the other player gets <b>one last turn</b> — so both have had the same number of guesses. Crack it too and it's a <b>tie</b>.</p></div>
+    <div class="card"><h3>Game modes</h3>
+      <p><b>Classic:</b> ${MODES.classic.desc}</p>
+      <p><b>Play it out:</b> ${MODES.playout.desc}</p>
+      <p><b>Race</b> (online and vs the computer): ${MODES.race.desc} Online, the clock starts only once you're both on the game screen.</p>
+      <p><b>Time trial</b> (pass the phone): ${MODES.trial.desc}</p></div>
     <div class="card"><h3>Three ways to play</h3>
       <p><b>Pass the phone:</b> both players share one phone. The game hides each code while you hand it over.</p>
       <p><b>Vs the computer:</b> pick Easy, Normal or Hard. Easy forgets some of its clues; Normal plays like a sharp human; Hard picks the guess that rules out the most possibilities every turn.</p>
@@ -743,6 +864,7 @@ function vSheet() {
   switch (ui.sheet) {
     case 'menu': return sheet(`
       <button class="btn primary" data-act="closesheet">Resume</button>
+      ${game && game.phase === 'play' && (game.mode === 'trial' || game.mode === 'playout') && !game.pending ? `<button class="btn danger" data-act="treveal">Give up — reveal the code</button>` : ''}
       <button class="btn" data-act="rules">How to play</button>
       <button class="btn" data-act="settings">Settings</button>
       <button class="btn" data-act="homekeep">Home (game is saved)</button>
@@ -801,7 +923,7 @@ function notify(gameId, kind) {
     body: JSON.stringify({ secret: me.secret, game: gameId, kind }) }).catch(() => {});
 }
 const oppName = () => (ui.og && ui.og.names[other(ui.og.me)]) || 'Your opponent';
-function yourAction(x) { return (x.status === 'play' && x.turn === x.me) || (x.status === 'codes' && !x.my_code_set); }
+function yourAction(x) { return (x.status === 'play' && (x.mode === 'race' || x.turn === x.me)) || (x.status === 'codes' && !x.my_code_set); }
 function yourTurnCount() { return (ui.olist || []).filter(yourAction).length; }
 function updateBadge() {
   const n = yourTurnCount();
@@ -859,9 +981,16 @@ function statusText(x) {
   switch (x.status) {
     case 'waiting': return ['Waiting for someone to join', `Code ${x.join_code}`, ''];
     case 'codes': return x.my_code_set ? [opp, `Waiting for their code`, 'Their turn'] : [opp, 'New game — pick your code', 'Your turn'];
-    case 'play': return [opp, x.cracked != null ? (x.cracked === x.me ? 'You cracked it — their last chance' : 'They cracked your code!') : `${x.moves} guess${x.moves === 1 ? '' : 'es'} so far`,
+    case 'play':
+      if (x.mode === 'race') return [opp, x.started_at ? 'Race in progress!' : "Race — starts when you're both on the game", x.started_at ? 'Race on!' : 'Ready check'];
+      if (x.mode === 'playout' && x.done) {
+        const mine = x.done[x.me], theirs = x.done[1 - x.me];
+        if (mine != null) return [opp, `You cracked it in ${mine} — they're still going`, 'Their turn'];
+        if (theirs != null) return [opp, `They cracked yours in ${theirs} — beat it!`, 'Your turn'];
+      }
+      return [opp, x.cracked != null ? (x.cracked === x.me ? 'You cracked it — their last chance' : 'They cracked your code!') : `${x.moves} guess${x.moves === 1 ? '' : 'es'} so far`,
       x.turn === x.me ? (x.cracked != null ? 'Last chance!' : 'Your turn') : 'Their turn'];
-    default: return [opp, x.draw ? 'Tie game' : x.winner === x.me ? 'You won' : `${opp} won`, x.draw ? '🤝' : x.winner === x.me ? '🏆' : ''];
+    default: return [opp, (x.mode && x.mode !== 'classic' ? MODES[x.mode].name + ' · ' : '') + (x.draw ? 'Tie game' : x.winner === x.me ? 'You won' : `${opp} won`), x.draw ? '🤝' : x.winner === x.me ? '🏆' : ''];
   }
 }
 function vOnline() {
@@ -896,8 +1025,9 @@ function vOnline() {
 function vONew() {
   return `<div class="screen scroll"><div class="content">
     <div class="pagehead"><button class="iconbtn" data-act="online">‹</button><h2>New online game</h2></div>
+    ${modePicker('omode', ['classic', 'playout', 'race'], settings.onlineMode || 'classic')}
     ${repeatsOpt('toggleNewRep')}
-    <p class="muted" style="margin:0;line-height:1.5">Next you'll pick your secret code. Then you'll get a join code to send to your opponent. A coin flip decides who guesses first.</p>
+    <p class="muted" style="margin:0;line-height:1.5">Next you'll pick your secret code. Then you'll get a join code to send to your opponent. ${(settings.onlineMode || 'classic') === 'race' ? "The race starts once you're both on the game screen, after a 3-2-1 countdown." : 'A coin flip decides who guesses first.'}</p>
     <button class="btn primary" data-act="onewgo">Pick my secret code</button>
   </div></div>`;
 }
@@ -913,7 +1043,7 @@ function vOJoin() {
 function vOCode() {
   const c = ui.ocode;
   return codeEntry({ left: `<button class="iconbtn" data-act="online">‹</button>`, title: 'Set your secret code',
-    note: c.mode === 'join' ? `${esc(c.host)} will try to crack this. Pick something you can remember!` : 'Your opponent will try to crack this. Pick something you can remember!',
+    note: `<b style="color:var(--text)">${MODES[c.gmode || 'classic'].name}</b> · ` + (c.mode === 'join' ? `${esc(c.host)} will try to crack this. Pick something you can remember!` : 'Your opponent will try to crack this. Pick something you can remember!'),
     repeats: c.repeats });
 }
 function vOGame() {
@@ -936,7 +1066,7 @@ function vOGame() {
   }
   if (st.status === 'codes' && !st.my_code) {
     return codeEntry({ left: `<button class="iconbtn" data-act="olist">‹</button>`, title: 'Rematch: pick your code',
-      note: `${opp} will try to crack it. ${st.starter === st.me ? 'You' : opp} will guess first.`, repeats: st.repeats });
+      note: `<b style="color:var(--text)">${MODES[st.mode || 'classic'].name}</b> · ${opp} will try to crack it. ` + (st.mode === 'race' ? "The race starts when you're both ready." : `${st.starter === st.me ? 'You' : opp} will guess first.`), repeats: st.repeats });
   }
   if (st.status === 'codes') {
     return `<div class="screen">${top('Rematch', 'Your code is locked in')}
@@ -944,7 +1074,46 @@ function vOGame() {
       <div class="stack"><button class="btn" data-act="olist">Back to my games</button></div></div></div>`;
   }
   if (st.status === 'over') return vOOver(st);
+  if (st.mode === 'race') return vORace(st, top);
   return vOPlay(st, top);
+}
+function vORace(st, top) {
+  const opp = esc(oppName()), off = ui.ooff || 0, now = Date.now() + off;
+  if (!st.started_at) {
+    const r = st.ready || [false, false], themR = r[1 - st.me];
+    const row = (who, ok) => `<div class="gitem" style="pointer-events:none"><span class="gt"><b>${who}</b></span><span class="badge ${ok ? 'go' : ''}">${ok ? '✓ Ready' : '⏳ Not here yet'}</span></div>`;
+    return `<div class="screen">${top('Race', 'Ready check')}
+      <div class="screen center" style="padding:0"><div class="content" style="align-items:center;max-width:420px">
+      <div class="trophy">🏁</div>
+      <p class="muted" style="margin:0 0 6px;line-height:1.5">The race starts as soon as you're <b style="color:var(--text)">both on this screen</b>, after a 3-2-1 countdown. Stay here!</p>
+      <div class="gamelist" style="width:100%">${row('You', r[st.me])}${row(opp, themR)}</div>
+      <p class="muted" style="font-size:14px"><span class="spin"></span>${themR ? 'Starting…' : `Waiting for ${opp}. We sent them a buzz.`}</p></div></div></div>`;
+  }
+  if (st.started_at > now) {
+    return `<div class="screen">${top('Race', `vs ${opp}`)}
+      <div class="screen center"><div class="muted">Get ready…</div>${countdownHtml(st.started_at, off)}
+      <p class="muted" style="max-width:340px;line-height:1.5">No turns. First to crack the other's code wins. Your notes and tools work as usual.</p></div></div>`;
+  }
+  const b = onlineBoard(), tab = ui.otab, fresh = ui.fresh; ui.fresh = false;
+  ui.peekCode = b.myCode;
+  const tabs = `<div class="minitabs">
+    <button data-act="otab" data-v="mine" class="${tab !== 'theirs' && tab !== 'notes' ? 'on' : ''}">Mine (${b.mine.length})</button>
+    <button data-act="otab" data-v="theirs" class="${tab === 'theirs' ? 'on' : ''}">${opp}'s (${b.theirs.length})</button>
+    <button data-act="otab" data-v="notes" class="narrowonly ${tab === 'notes' ? 'on' : ''}">📝 Notes</button></div>`;
+  const theirs = tab === 'theirs';
+  const hist = theirs
+    ? historyHtml(b.theirs, false, `${opp}'s guesses on your code <b class="mono">${esc(b.myCode)}</b> appear here live.`, tabs)
+    : historyHtml(b.mine, fresh, 'Go go go! Enter 4 digits and tap Guess.', tabs, { notes: b.notes, pane: tab === 'notes' ? notesPane(b) : '' });
+  const best = bestOf(b.theirs);
+  return `<div class="screen">
+    <div class="topbar"><button class="iconbtn" data-act="olist">‹</button>
+      <div class="t"><h2>Race! ${clockHtml(st.started_at, null, off)}</h2><div>vs ${opp} · first to crack it wins</div></div>
+      <button class="iconbtn" data-act="omenu">≡</button><button class="peek" id="peek" style="min-width:84px">My code</button></div>
+    <button class="opp tap" data-act="otab" data-v="theirs" style="width:100%;text-align:left"><span><b style="color:var(--p1)">${opp}</b> live: ${plural(b.theirs.length, 'guess')}${b.theirs.length ? ' · best' : ''}</span>${b.theirs.length ? pegs(best.e, best.n) : ''}</button>
+    <div class="play">
+      <div class="left">${hist}${theirs ? '' : assistHtml(b)}</div>
+      <div class="controls">${guessControls(b)}</div>
+    </div></div>`;
 }
 function vOPlay(st, top) {
   const b = onlineBoard(), opp = esc(oppName()), myTurn = st.turn === st.me;
@@ -967,7 +1136,8 @@ function vOPlay(st, top) {
     controls = `${noting ? `<button class="btn narrowonly backbar" data-act="otab" data-v="mine">Back to my guesses</button>` : ''}<div class="result ${noting ? 'wideonly' : ''}">
         ${last ? `<div class="muted" style="font-size:14px">Your guess <b class="mono" style="color:var(--text)">${last.g}</b></div>
           <div class="big" style="margin-bottom:4px"><div><strong style="color:var(--hit)">${last.e}</strong>right spot</div><div><strong style="color:var(--near)">${last.n}</strong>wrong spot</div></div>` : ''}
-        <div class="waiting"><span class="spin"></span>${st.cracked === st.me ? `🎉 You cracked it! ${opp} gets one last turn to tie…` : `${opp}'s turn to guess…`}</div>
+        <div class="waiting"><span class="spin"></span>${st.cracked === st.me ? `🎉 You cracked it! ${opp} gets one last turn to tie…`
+          : st.mode === 'playout' && st.done[st.me] != null ? `🎉 You cracked it in ${st.done[st.me]}! ${opp} is still going…` : `${opp}'s turn to guess…`}</div>
         <div class="muted" style="font-size:13px">${ui.pushOk ? "We'll buzz you when it's your move." : "You can leave — your game is saved."}</div></div>
       <div class="wideonly">${notesHead}<div class="notes">${t.chips}</div>
       <div class="toolhead"><span>Spot grid</span></div>${t.grid}</div>
@@ -978,7 +1148,8 @@ function vOPlay(st, top) {
     <div class="topbar"><button class="iconbtn" data-act="olist">‹</button>
       <div class="t"><h2>${myTurn ? '<span style="color:var(--hit)">Your turn</span>' : `${opp}'s turn`}</h2><div>Cracking ${opp}'s code · ${myTurn ? `guess #${b.mine.length + 1}` : `${plural(b.mine.length, 'guess')} so far`}</div></div>
       <button class="iconbtn" data-act="omenu">≡</button><button class="peek" id="peek" style="min-width:84px">My code</button></div>
-    ${st.cracked != null && st.cracked !== st.me && myTurn ? lastChanceBar(opp, 'your') : `<button class="opp tap" data-act="otab" data-v="theirs" style="width:100%;text-align:left"><span><b style="color:var(--p1)">${opp}</b> has made ${plural(b.theirs.length, 'guess')} on your code</span>${b.theirs.length ? `<span class="muted">best</span>${pegs(best.e, best.n)}` : ''}</button>`}
+    ${st.mode === 'playout' && st.done[1 - st.me] != null && myTurn ? playoutBar(opp, st.done[1 - st.me], b.mine.length, 'oresign')
+      : st.cracked != null && st.cracked !== st.me && myTurn ? lastChanceBar(opp, 'your') : `<button class="opp tap" data-act="otab" data-v="theirs" style="width:100%;text-align:left"><span><b style="color:var(--p1)">${opp}</b> has made ${plural(b.theirs.length, 'guess')} on your code</span>${b.theirs.length ? `<span class="muted">best</span>${pegs(best.e, best.n)}` : ''}</button>`}
     <div class="play">
       <div class="left">${hist}${theirs ? '' : assistHtml(b)}</div>
       <div class="controls">${controls}</div>
@@ -990,6 +1161,11 @@ function vOOver(st) {
   const codes = st.me === 0 ? [st.my_code, st.their_code] : [st.their_code, st.my_code];
   let line;
   if (st.resigned) line = won ? `${opp} gave up.` : 'You gave up.';
+  else if (st.mode === 'race') {
+    const t = st.ended_at && st.started_at ? fmtTime(st.ended_at - st.started_at) : '';
+    line = won ? `You cracked ${opp}'s code first — ${t}, in ${plural(mine, 'guess')}. ${opp} had made ${theirs}.` : `${opp} cracked your code first — ${t}, in ${plural(theirs, 'guess')}. You had made ${mine}.`;
+  }
+  else if (st.mode === 'playout') line = `You: ${st.done[st.me] != null ? plural(st.done[st.me], 'guess') : '—'} · ${opp}: ${st.done[1 - st.me] != null ? plural(st.done[1 - st.me], 'guess') : '—'}`;
   else if (tie) line = `You both cracked the code in ${plural(mine, 'guess')}.`;
   else if (st.cracked != null) line = won ? `You cracked ${opp}'s code in ${plural(mine, 'guess')}, and their last chance missed.` : `${opp} cracked your code in ${plural(theirs, 'guess')}, and your last chance missed.`;
   else line = won ? `You cracked ${opp}'s code in ${plural(mine, 'guess')}. ${opp} made ${theirs}.` : `${opp} cracked your code in ${plural(theirs, 'guess')}. You made ${mine}.`;
@@ -1023,14 +1199,29 @@ async function loadList() {
 async function loadGame(quiet) {
   const id = ui.ogId; if (!id || !me) return;
   try {
+    const t0 = Date.now();
     const st = await rpc('cb_state', { p_secret: me.secret, p_game: id });
     if (ui.ogId !== id || ui.view !== 'oGame') return;
+    ui.ooff = st.server_now - Math.round((t0 + Date.now()) / 2);   // server clock vs this phone
     const prev = ui.og;
+    if (st.mode === 'race' && st.status === 'play' && !st.started_at && !st.ready[st.me] && !document.hidden && !ui.readyBusy) {
+      ui.readyBusy = true;
+      rpc('cb_ready', { p_secret: me.secret, p_game: id }).then(r => { if (!r.both) notify(id, 'ready'); ui.readyBusy = false; loadGame(true); })
+        .catch(() => { ui.readyBusy = false; });
+    }
     const changed = !prev || prev.id !== st.id || prev.updated_at !== st.updated_at || prev.status !== st.status || prev.guesses.length !== st.guesses.length;
     ui.og = st; ui.oerr = '';
     if (!changed) return;
     if (prev && prev.id === st.id && !quiet) {
-      if (st.status === 'over' && prev.status !== 'over') {
+      const o = 1 - st.me;
+      if (st.mode === 'race' && st.status === 'over' && prev.status !== 'over') {
+        if (st.winner === st.me) { sfx.win(); confetti(); } else { sfx.lose(); showBanner(st.resigned ? `${esc(oppName())} gave up!` : `${esc(oppName())} cracked it first!`, 'var(--p1)'); }
+      } else if (st.mode === 'race' && st.status === 'play') {
+        if (st.started_at && !prev.started_at) sfx.turn();
+        else if (st.guesses.length > prev.guesses.length) tone(330, 0.08, 'triangle', 0.04);
+      } else if (st.mode === 'playout' && st.status === 'play' && st.done[o] != null && prev.done[o] == null) {
+        sfx.turn(); showBanner(`${esc(oppName())} cracked yours in ${st.done[o]}!`, 'var(--near)');
+      } else if (st.status === 'over' && prev.status !== 'over') {
         if (st.draw) { sfx.turn(); showBanner("It's a tie!", 'var(--near)'); } else if (st.winner === st.me) { sfx.win(); confetti(); } else sfx.lose();
       } else if (st.status === 'play' && st.turn === st.me && (prev.turn !== st.me || prev.status !== 'play')) {
         sfx.turn();
@@ -1056,12 +1247,12 @@ function oLock() {
   withBusy(async () => {
     if (ui.view === 'oGame' && st && st.status === 'codes') {
       await rpc('cb_set_code', { p_secret: me.secret, p_game: st.id, p_code: code });
-      sfx.lock(); notify(st.id, 'code'); resetEntry(); ui.og = null; ui.busy = false; openGame(st.id); return;
+      sfx.lock(); if (st.mode !== 'race') notify(st.id, 'code'); resetEntry(); ui.og = null; ui.busy = false; openGame(st.id); return;
     }
     const c = ui.ocode;
     let id;
-    if (c.mode === 'create') id = (await rpc('cb_create', { p_secret: me.secret, p_repeats: c.repeats, p_code: code })).id;
-    else { id = await rpc('cb_join', { p_secret: me.secret, p_join: c.join, p_code: code }); notify(id, 'join'); }
+    if (c.mode === 'create') id = (await rpc('cb_create', { p_secret: me.secret, p_repeats: c.repeats, p_code: code, p_mode: c.gmode || 'classic' })).id;
+    else { id = await rpc('cb_join', { p_secret: me.secret, p_join: c.join, p_code: code }); if (c.gmode !== 'race') notify(id, 'join'); }   // races buzz when you're ready instead
     sfx.lock(); resetEntry(); ui.busy = false; openGame(id); loadList();
   });
 }
@@ -1070,10 +1261,15 @@ function oGuess() {
   if (st.guesses.some(x => x.p === st.me && x.g === g)) { flash('You already guessed ' + g + '.'); return; }
   withBusy(async () => {
     const r = await rpc('cb_guess', { p_secret: me.secret, p_game: st.id, p_guess: g });
-    notify(st.id, 'guess'); resetEntry(); ui.fresh = true; ui.otab = 'mine';
+    // no buzz for every race guess, or while you play on after they've already finished
+    const quiet = !r.over && (st.mode === 'race' || (st.mode === 'playout' && st.done[1 - st.me] != null));
+    if (!quiet) notify(st.id, 'guess');
+    resetEntry(); ui.fresh = true; ui.otab = 'mine';
     sfx.result(r.exact, r.near);
-    if (r.cracked) { setTimeout(sfx.turn, 450); setTimeout(() => showBanner(`Cracked! ${esc(oppName())} gets one last turn`, 'var(--hit)'), 300); }
+    if (r.cracked && st.mode === 'playout') { setTimeout(sfx.turn, 450); setTimeout(() => showBanner(`Cracked in ${st.guesses.filter(x => x.p === st.me).length + 1}! ${esc(oppName())} plays on`, 'var(--hit)'), 300); }
+    else if (r.cracked) { setTimeout(sfx.turn, 450); setTimeout(() => showBanner(`Cracked! ${esc(oppName())} gets one last turn`, 'var(--hit)'), 300); }
     else if (r.over && r.draw) setTimeout(() => showBanner("It's a tie!", 'var(--near)'), 300);
+    else if (r.over && st.mode === 'playout') setTimeout(() => { loadGame(true).then(() => { const g = ui.og; if (g && g.winner === g.me) { sfx.win(); confetti(); } else if (g && g.draw) sfx.turn(); else sfx.lose(); }); }, 450);
     else if (r.over && r.exact === 4) { setTimeout(sfx.win, 450); setTimeout(confetti, 300); }
     else if (r.over) setTimeout(sfx.lose, 450);
     ui.busy = false; await loadGame(true); loadList();
@@ -1147,58 +1343,109 @@ function aiBoard() {
   return { p: 0, names: ai.names, mine: ai.guesses[0], theirs: ai.guesses[1], notes: ai.notes,
     save: saveAi, myCode: ai.codes[0], repeats: ai.repeats };
 }
-function aiNewGame(level, repeats, first) {
-  settings.repeats = repeats; settings.aiLevel = level; saveSettings();
+const RACE_PACE = { easy: 24000, normal: 20000, hard: 17000 };   // average time between the computer's race guesses
+const racePace = () => RACE_PACE[ai.level] * (0.7 + Math.random() * 0.6);
+function aiNewGame(level, repeats, first, mode) {
+  mode = mode || 'classic';
+  settings.repeats = repeats; settings.aiLevel = level; settings.aiMode = mode; saveSettings();
   const starter = first === 2 ? (Math.random() < 0.5 ? 0 : 1) : first;
-  ai = { v: 1, level, repeats, starter, turn: starter, phase: 'code', names: [aiMyName(), 'Computer'],
-    codes: ['', randomCode(repeats)], guesses: [[], []], notes: mkNotes(), winner: null, resigned: false };
+  if (aiTimer) { clearTimeout(aiTimer); aiTimer = null; }
+  ai = { v: 1, level, mode, repeats, starter, turn: starter, phase: 'code', names: [aiMyName(), 'Computer'],
+    codes: ['', randomCode(repeats)], guesses: [[], []], notes: mkNotes(), winner: null, resigned: false,
+    done: [null, null], t0: null, nextAt: null, tEnd: null };
   saveAi(); resetEntry(); ui.otab = 'mine'; ui.view = 'aGame'; render();
 }
 const aiMyName = () => (me && me.name) || (names[0] && names[0] !== 'Player 1' ? names[0] : 'You');
 function aiRecordFor(level) { return aiRecord[level] || { w: 0, l: 0 }; }
 function aiFinish(winner) {
   ai.phase = 'over'; ai.winner = winner; ai.draw = winner === null;
+  if (ai.mode === 'race' && !ai.tEnd) ai.tEnd = Date.now();
   const r = aiRecordFor(ai.level);
   if (winner === null) r.d = (r.d || 0) + 1; else if (winner === 0) r.w++; else r.l++;
   aiRecord[ai.level] = r; LS.set('cb.aiwins', aiRecord);
+  recordGame({ kind: 'ai', mode: ai.mode || 'classic', level: ai.level, opp: `Computer · ${LEVELS[ai.level]}`,
+    result: winner === null ? 'draw' : winner === 0 ? 'win' : 'loss', mine: ai.guesses[0].length, theirs: ai.guesses[1].length,
+    ms: ai.mode === 'race' && ai.t0 ? ai.tEnd - ai.t0 : null, resigned: !!ai.resigned });
 }
+const aiDecide = () => ai.done[0] < ai.done[1] ? 0 : ai.done[0] > ai.done[1] ? 1 : null;   // play it out: fewer guesses wins
 function aiLock() {
   const c = entryStr(); if (!c) return;
   if (!ai.repeats && hasRepeat(c)) { flash('No repeated digits in this game.'); return; }
-  ai.codes[0] = c; ai.phase = 'play'; sfx.lock(); saveAi(); resetEntry(); render();
-  showBanner(ai.turn === 0 ? 'You go first!' : 'Computer goes first', ai.turn === 0 ? 'var(--hit)' : 'var(--p1)');
+  ai.codes[0] = c; ai.phase = 'play'; sfx.lock();
+  if (ai.mode === 'race') { ai.t0 = Date.now() + 3500; ai.nextAt = ai.t0 + racePace(); }
+  saveAi(); resetEntry(); render();
+  if (ai.mode !== 'race') showBanner(ai.turn === 0 ? 'You go first!' : 'Computer goes first', ai.turn === 0 ? 'var(--hit)' : 'var(--p1)');
 }
 function aiGuess() {
   const g = entryStr(); if (!g) return;
+  if (ai.mode === 'race' && Date.now() < ai.t0) { flash('Wait for GO!'); return; }
   if (ai.guesses[0].some(x => x.g === g)) { flash('You already guessed ' + g + '.'); return; }
   const [e, n] = score(g, ai.codes[1]);
   ai.guesses[0].push({ g, e, n }); ui.fresh = true; resetEntry(); ui.otab = 'mine';
-  if (ai.cracked === 1) {
+  const cnt = ai.guesses[0].length, mode = ai.mode || 'classic';
+  if (mode === 'race') {
+    if (e === 4) { ai.tEnd = Date.now(); aiFinish(0); sfx.result(4, 0); setTimeout(sfx.win, 450); setTimeout(confetti, 300); }
+    else sfx.result(e, n);
+  } else if (mode === 'playout') {
+    if (e === 4) {
+      ai.done[0] = cnt; sfx.result(4, 0);
+      if (ai.done[1] != null) { aiFinish(aiDecide()); setTimeout(ai.winner === 0 ? sfx.win : sfx.lose, 450); }
+      else { ai.turn = 1; setTimeout(() => showBanner(`Cracked in ${cnt}! The computer plays on`, 'var(--hit)'), 300); }
+    } else { ai.turn = ai.done[1] != null ? 0 : 1; sfx.result(e, n); }
+  } else if (ai.cracked === 1) {
     // your last-chance turn after the computer cracked your code
     if (e === 4) { aiFinish(null); sfx.result(4, 0); setTimeout(sfx.win, 450); } else { aiFinish(1); sfx.result(e, n); setTimeout(sfx.lose, 450); }
-  } else if (e === 4 && ai.guesses[1].length < ai.guesses[0].length) {
+  } else if (e === 4 && ai.guesses[1].length < cnt) {
     ai.cracked = 0; ai.turn = 1; sfx.result(4, 0); setTimeout(sfx.turn, 450);
     setTimeout(() => showBanner('Cracked! Computer gets one last turn', 'var(--hit)'), 300);
   } else if (e === 4) { aiFinish(0); sfx.result(4, 0); setTimeout(sfx.win, 450); setTimeout(confetti, 300); }
   else { ai.turn = 1; sfx.result(e, n); }
   saveAi(); render();
 }
+function aiComputerGuess() {
+  const g = aiPickGuess(ai.level, ai.guesses[1], ai.repeats);
+  const [e, n] = score(g, ai.codes[0]);
+  ai.guesses[1].push({ g, e, n });
+  return [g, e, n];
+}
 function aiScheduleMove() {
+  if (aiTimer || !ai || ai.phase !== 'play') return;
+  const show = (fx, text, color) => { if (ui.view === 'aGame') { render(); if (fx) fx(); if (text) showBanner(text, color); } };
+  if (ai.mode === 'race') {
+    // the computer guesses on its own clock; if you were away it catches up
+    aiTimer = setTimeout(() => {
+      aiTimer = null;
+      if (!ai || ai.phase !== 'play' || ai.mode !== 'race') return;
+      const [, e] = aiComputerGuess();
+      if (e === 4) { ai.tEnd = Math.min(Date.now(), ai.nextAt); aiFinish(1); saveAi(); return show(sfx.lose); }
+      ai.nextAt += racePace(); saveAi();
+      show(() => tone(330, 0.08, 'triangle', 0.04));
+      aiScheduleMove();
+    }, Math.max(150, ai.nextAt - Date.now()));
+    return;
+  }
+  if (ai.turn !== 1) return;
   // the computer "thinks" for a moment so its turn is easy to follow
-  if (aiTimer || !ai || ai.phase !== 'play' || ai.turn !== 1) return;
   aiTimer = setTimeout(() => {
     aiTimer = null;
     if (!ai || ai.phase !== 'play' || ai.turn !== 1) return;
-    const g = aiPickGuess(ai.level, ai.guesses[1], ai.repeats);
-    const [e, n] = score(g, ai.codes[0]);
-    ai.guesses[1].push({ g, e, n });
-    const show = (fx, text, color) => { if (ui.view === 'aGame') { render(); fx(); if (text) showBanner(text, color); } };
+    const [g, e] = aiComputerGuess(), cnt = ai.guesses[1].length;
+    if (ai.mode === 'playout') {
+      if (e === 4) {
+        ai.done[1] = cnt;
+        if (ai.done[0] != null) { aiFinish(aiDecide()); saveAi(); return show(ai.winner === 0 ? () => { sfx.win(); confetti(); } : ai.winner === null ? sfx.turn : sfx.lose); }
+        ai.turn = 0; saveAi(); return show(sfx.turn, `Computer cracked yours in ${cnt}!`, 'var(--near)');
+      }
+      ai.turn = ai.done[0] != null ? 1 : 0; saveAi();
+      show(ai.turn === 0 ? sfx.turn : null, ai.turn === 0 ? `Computer guessed ${g}` : '', 'var(--p1)');
+      return aiScheduleMove();
+    }
     if (ai.cracked === 0) {
       // the computer's last-chance turn after you cracked its code
       aiFinish(e === 4 ? null : 0); saveAi();
       return show(e === 4 ? sfx.turn : () => { sfx.win(); confetti(); }, e === 4 ? 'Computer tied it!' : '', 'var(--near)');
     }
-    if (e === 4 && ai.guesses[0].length < ai.guesses[1].length) {
+    if (e === 4 && ai.guesses[0].length < cnt) {
       ai.cracked = 1; ai.turn = 0; saveAi();
       return show(sfx.turn, 'Last chance!', 'var(--near)');
     }
@@ -1208,7 +1455,7 @@ function aiScheduleMove() {
   }, 1300 + Math.random() * 900);
 }
 function vANew() {
-  const lv = settings.aiLevel || 'normal', first = ui.first === undefined ? 0 : ui.first;
+  const lv = settings.aiLevel || 'normal', am = settings.aiMode || 'classic', first = ui.first === undefined ? 0 : ui.first;
   const desc = { easy: 'Forgets some of its clues and guesses wildly at times. Usually needs about 10 guesses.',
     normal: 'Always plays a guess that fits most of what it knows. Usually cracks a code in about 7.',
     hard: 'Picks the guess that rules out the most possibilities every turn. Usually 5 or 6.' };
@@ -1218,22 +1465,25 @@ function vANew() {
     <div class="field"><label>Difficulty</label>
       <div class="seg" style="margin:0">${Object.keys(LEVELS).map(k => `<button data-act="alevel" data-v="${k}" class="${lv === k ? 'on' : ''}">${LEVELS[k]}</button>`).join('')}</div>
       <small class="muted" style="line-height:1.45;font-size:13px">${desc[lv]}${rec.w + rec.l + (rec.d || 0) ? ` Your record on ${LEVELS[lv]}: <b style="color:var(--text)">${rec.w} won, ${rec.l} lost${rec.d ? `, ${rec.d} tied` : ''}</b>.` : ''}</small></div>
+    ${modePicker('amode', ['classic', 'playout', 'race'], am)}
+    ${am === 'race' ? `<p class="muted" style="margin:0;font-size:13px;line-height:1.45">In a race the computer makes a guess about every ${Math.round(RACE_PACE[lv] / 1000)} seconds on ${LEVELS[lv]}.</p>` : ''}
     ${repeatsOpt('toggleNewRep')}
-    <div class="field"><label>Who guesses first?</label>
+    ${am === 'race' ? '' : `<div class="field"><label>Who guesses first?</label>
       <div class="seg" style="margin:0">
         <button data-act="first" data-v="0" class="${first === 0 ? 'on' : ''}">Me</button>
         <button data-act="first" data-v="1" class="${first === 1 ? 'on' : ''}">Computer</button>
         <button data-act="first" data-v="2" class="${first === 2 ? 'on' : ''}">Random</button>
-      </div></div>
+      </div></div>`}
     <button class="btn primary" data-act="astart" style="margin-top:8px">Start — pick my secret code</button>
   </div></div>`;
 }
 function vAGame() {
   if (!ai) { ui.view = 'aNew'; return vANew(); }
   if (ai.phase === 'code') return codeEntry({ left: `<button class="iconbtn" data-act="amenu">≡</button>`, title: 'Set your secret code',
-    note: `The computer (${LEVELS[ai.level]}) will try to crack it. It can't see your code — honest!`, repeats: ai.repeats });
+    note: `${MODES[ai.mode || 'classic'].name} vs the computer (${LEVELS[ai.level]}). It can't see your code — honest!`, repeats: ai.repeats });
   if (ai.phase === 'over') return vAOver();
-  const b = aiBoard(), myTurn = ai.turn === 0, tab = ui.otab;
+  const race = ai.mode === 'race', started = race && Date.now() >= ai.t0;
+  const b = aiBoard(), myTurn = race ? started : ai.turn === 0, tab = ui.otab;
   const fresh = ui.fresh; ui.fresh = false;
   ui.peekCode = b.myCode;
   const tabs = `<div class="minitabs">
@@ -1245,21 +1495,29 @@ function vAGame() {
     ? historyHtml(b.theirs, false, `This is how close the computer is to your code <b class="mono">${esc(b.myCode)}</b>.`, tabs)
     : historyHtml(b.mine, fresh, myTurn ? 'Enter 4 digits and tap Guess.' : '', tabs, { notes: b.notes, pane: tab === 'notes' ? notesPane(b) : '' });
   let controls;
-  if (myTurn) controls = guessControls(b);
+  if (race && !started) controls = `<div class="result"><div class="muted">The race starts in</div>${countdownHtml(ai.t0)}<div class="muted" style="font-size:13px">No turns — guess as fast as you can think.</div></div>`;
+  else if (myTurn) controls = guessControls(b);
   else {
     const last = b.mine[b.mine.length - 1], t = toolsHtml(b.notes), noting = tab === 'notes';
+    const waitText = ai.cracked === 0 ? '🎉 You cracked it! The computer gets one last turn to tie…'
+      : ai.mode === 'playout' && ai.done[0] != null ? `🎉 You cracked it in ${ai.done[0]}! The computer is still going…` : 'The computer is thinking…';
     controls = `${noting ? `<button class="btn narrowonly backbar" data-act="otab" data-v="mine">Back to my guesses</button>` : ''}<div class="result ${noting ? 'wideonly' : ''}">
         ${last ? `<div class="muted" style="font-size:14px">Your guess <b class="mono" style="color:var(--text)">${last.g}</b></div>
           <div class="big" style="margin-bottom:4px"><div><strong style="color:var(--hit)">${last.e}</strong>right spot</div><div><strong style="color:var(--near)">${last.n}</strong>wrong spot</div></div>` : ''}
-        <div class="waiting"><span class="spin"></span>${ai.cracked === 0 ? '🎉 You cracked it! The computer gets one last turn to tie…' : 'The computer is thinking…'}</div></div>
+        <div class="waiting"><span class="spin"></span>${waitText}</div></div>
       <div class="wideonly">${notesHead}<div class="notes">${t.chips}</div><div class="toolhead"><span>Spot grid</span></div>${t.grid}</div>`;
   }
-  const lastTheirs = b.theirs[b.theirs.length - 1];
+  const lastTheirs = b.theirs[b.theirs.length - 1], bestTheirs = bestOf(b.theirs);
+  const title = race ? (started ? `Race! ${clockHtml(ai.t0)}` : 'Get ready…') : myTurn ? '<span style="color:var(--hit)">Your turn</span>' : "Computer's turn";
+  let bar;
+  if (race) bar = `<button class="opp tap" data-act="otab" data-v="theirs" style="width:100%;text-align:left"><span><b style="color:var(--p1)">Computer</b> ${plural(b.theirs.length, 'guess')}${b.theirs.length ? ' · best' : ' so far'}</span>${b.theirs.length ? pegs(bestTheirs.e, bestTheirs.n) : ''}</button>`;
+  else if (ai.mode === 'playout' && ai.done[1] != null && myTurn) bar = playoutBar('The computer', ai.done[1], b.mine.length, 'aresign');
+  else if (ai.cracked === 1 && myTurn) bar = lastChanceBar('The computer', 'your');
   return `<div class="screen">
     <div class="topbar"><button class="iconbtn" data-act="amenu">≡</button>
-      <div class="t"><h2>${myTurn ? '<span style="color:var(--hit)">Your turn</span>' : "Computer's turn"}</h2><div>vs Computer · ${LEVELS[ai.level]} · ${myTurn ? `guess #${b.mine.length + 1}` : `${plural(b.mine.length, 'guess')} so far`}</div></div>
+      <div class="t"><h2>${title}</h2><div>${MODES[ai.mode || 'classic'].name} · ${LEVELS[ai.level]} · ${myTurn ? `guess #${b.mine.length + 1}` : `${plural(b.mine.length, 'guess')} so far`}</div></div>
       <button class="peek" id="peek">My code</button></div>
-    ${ai.cracked === 1 && myTurn ? lastChanceBar('The computer', 'your') : `<button class="opp tap" data-act="otab" data-v="theirs" style="width:100%;text-align:left"><span><b style="color:var(--p1)">Computer</b> ${lastTheirs ? `last guessed <b class="mono">${lastTheirs.g}</b> on your code` : "hasn't guessed yet"}</span>${lastTheirs ? pegs(lastTheirs.e, lastTheirs.n) : ''}</button>`}
+    ${bar ? bar : `<button class="opp tap" data-act="otab" data-v="theirs" style="width:100%;text-align:left"><span><b style="color:var(--p1)">Computer</b> ${lastTheirs ? `last guessed <b class="mono">${lastTheirs.g}</b> on your code` : "hasn't guessed yet"}</span>${lastTheirs ? pegs(lastTheirs.e, lastTheirs.n) : ''}</button>`}
     <div class="play">
       <div class="left">${hist}${theirs ? '' : assistHtml(b)}</div>
       <div class="controls">${controls}</div>
@@ -1267,7 +1525,11 @@ function vAGame() {
 }
 function vAOver() {
   const won = ai.winner === 0, tie = ai.winner === null, mine = ai.guesses[0].length, theirs = ai.guesses[1].length, rec = aiRecordFor(ai.level);
-  const line = ai.resigned ? 'You gave up.' : tie ? `You both cracked the code in ${plural(mine, 'guess')}.`
+  const t = ai.t0 && ai.tEnd ? fmtTime(ai.tEnd - ai.t0) : '';
+  const line = ai.resigned ? 'You gave up.'
+    : ai.mode === 'race' ? (won ? `You cracked its code first — ${t}, in ${plural(mine, 'guess')}. The computer had made ${theirs}.` : `The computer cracked your code first — ${t}, in ${plural(theirs, 'guess')}. You had made ${mine}.`)
+    : ai.mode === 'playout' ? `You: ${isFinite(ai.done[0]) ? plural(ai.done[0], 'guess') : 'gave up'} · Computer: ${ai.done[1] != null ? plural(ai.done[1], 'guess') : '—'}`
+    : tie ? `You both cracked the code in ${plural(mine, 'guess')}.`
     : won ? (ai.cracked === 0 ? `You cracked its code in ${plural(mine, 'guess')}, and it missed its last chance.` : `You cracked its code in ${plural(mine, 'guess')}. The computer made ${theirs}.`)
     : (ai.cracked === 1 ? `The computer cracked your code in ${plural(theirs, 'guess')}, and your last chance missed.` : `The computer cracked your code in ${plural(theirs, 'guess')}. You made ${mine}.`);
   return `<div class="screen center scroll">
@@ -1277,11 +1539,112 @@ function vAOver() {
     ${codesCards(ai.names, ai.codes)}
     <div class="score">${LEVELS[ai.level]} record: <b>${rec.w}</b>won · <b>${rec.l}</b>lost${rec.d ? ` · <b>${rec.d}</b>tied` : ''}</div>
     <div class="stack">
-      <button class="btn primary" data-act="arematch">Play again (${LEVELS[ai.level]})</button>
-      <button class="btn" data-act="anew">Change difficulty</button>
+      <button class="btn primary" data-act="arematch">Play again (${MODES[ai.mode || 'classic'].name} · ${LEVELS[ai.level]})</button>
+      <button class="btn" data-act="anew">Change mode or difficulty</button>
       <button class="btn" data-act="areview">Review both boards</button>
       <button class="btn" data-act="home">Home</button>
     </div></div>`;
+}
+
+/* ================= stats ================= */
+async function loadStats() {
+  if (!me) return;
+  try { ui.ohist = await rpc('cb_history', { p_secret: me.secret }); ui.ohistErr = ''; }
+  catch (e) { ui.ohistErr = e.message; }
+  if (ui.view === 'stats') render();
+}
+function myRecords(filter) {
+  // your own games: online + vs the computer (pass-the-phone games are shown head-to-head instead)
+  const out = [];
+  if (filter !== 'ai') for (const h of ui.ohist || []) out.push({ t: +h.t, kind: 'online', mode: h.mode || 'classic', opp: h.opponent || 'Opponent', result: h.result, mine: +h.mine, theirs: +h.theirs, ms: h.ms == null ? null : +h.ms, resigned: h.resigned });
+  if (filter !== 'online') for (const g of gameLog) if (g.kind === 'ai') out.push(g);
+  return out.sort((a, b) => b.t - a.t);
+}
+function tally(list) {
+  const r = { w: 0, l: 0, d: 0 };
+  list.forEach(x => { if (x.result === 'win') r.w++; else if (x.result === 'loss') r.l++; else r.d++; });
+  return r;
+}
+function streaks(list) {
+  let cur = 0, best = 0, run = 0, counting = true;
+  for (const x of list) { if (counting) { if (x.result === 'win') cur++; else counting = false; } }
+  for (const x of list.slice().reverse()) { run = x.result === 'win' ? run + 1 : 0; best = Math.max(best, run); }
+  return { cur, best };
+}
+const wlBar = r => {
+  const n = r.w + r.l + r.d || 1;
+  return `<div class="wl"><i style="flex:${r.w / n};background:var(--hit)"></i><i style="flex:${r.d / n};background:var(--near)"></i><i style="flex:${r.l / n};background:var(--danger)"></i></div>`;
+};
+const whenText = t => {
+  const d = new Date(t), today = new Date(); const days = Math.floor((new Date(today.toDateString()) - new Date(d.toDateString())) / 86400000);
+  return days === 0 ? 'Today' : days === 1 ? 'Yesterday' : days < 7 ? d.toLocaleDateString(undefined, { weekday: 'long' }) : d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+};
+function statTile(big, label) { return `<div class="stile"><b>${big}</b><span>${label}</span></div>`; }
+function vStats() {
+  const f = ui.sfilter || 'all';
+  const seg = `<div class="seg" style="margin:0">${[['all', 'All'], ['online', 'Online'], ['ai', 'Computer'], ['local', '1 phone']].map(([k, l]) => `<button data-act="sfilter" data-v="${k}" class="${f === k ? 'on' : ''}">${l}</button>`).join('')}</div>`;
+  const head = `<div class="pagehead"><button class="iconbtn" data-act="home">‹</button><h2>Stats</h2></div>${seg}`;
+  if (f === 'local') return `<div class="screen scroll"><div class="content">${head}${localStats()}</div></div>`;
+  const loading = me && !ui.ohist && f !== 'ai' ? `<div class="note"><span class="spin"></span>Loading your online games…</div>` : '';
+  const recs = myRecords(f);
+  if (!recs.length) return `<div class="screen scroll"><div class="content">${head}${loading}
+    ${loading ? '' : `<div class="note">No games here yet. ${f === 'online' && !me ? 'Play online to start your record.' : 'Finish a game and it shows up here.'}</div>`}</div></div>`;
+  const t = tally(recs), n = recs.length, st = streaks(recs);
+  const cracked = recs.filter(x => (x.result === 'win' || x.result === 'draw') && !x.resigned && x.mine > 0);
+  const fewest = cracked.length ? Math.min(...cracked.map(x => x.mine)) : null;
+  const avg = cracked.length ? (cracked.reduce((a, x) => a + x.mine, 0) / cracked.length).toFixed(1) : null;
+  const raceWins = recs.filter(x => x.mode === 'race' && x.result === 'win' && x.ms);
+  const fastest = raceWins.length ? Math.min(...raceWins.map(x => x.ms)) : null;
+  const group = key => {
+    const m = new Map();
+    recs.forEach(x => { const k = key(x); if (!m.has(k)) m.set(k, []); m.get(k).push(x); });
+    return [...m.entries()].sort((a, b) => b[1].length - a[1].length).map(([k, list]) => {
+      const r = tally(list);
+      return `<div class="srow"><div><b>${esc(k)}</b><small>${r.w} won · ${r.l} lost${r.d ? ` · ${r.d} tied` : ''}</small></div>${wlBar(r)}</div>`;
+    }).join('');
+  };
+  const recent = recs.slice(0, 20).map(x => {
+    const icon = x.result === 'win' ? '🏆' : x.result === 'draw' ? '🤝' : '·';
+    const detail = x.resigned ? (x.result === 'win' ? 'they gave up' : 'you gave up') : x.mode === 'race' && x.ms ? `${fmtTime(x.ms)} · you ${x.mine}, them ${x.theirs}` : `you ${x.mine} · them ${x.theirs} guesses`;
+    return `<div class="srow"><div><b>${icon} ${esc(x.opp)}</b><small>${MODES[x.mode || 'classic'].name} · ${detail}</small></div>
+      <span class="badge ${x.result === 'win' ? 'go' : ''}">${x.result === 'win' ? 'Won' : x.result === 'draw' ? 'Tie' : 'Lost'}</span><small class="muted when">${whenText(x.t)}</small></div>`;
+  }).join('');
+  return `<div class="screen scroll"><div class="content">${head}${loading}
+    <div class="stiles">
+      ${statTile(n, n === 1 ? 'game' : 'games')}
+      ${statTile(Math.round(t.w / n * 100) + '%', 'win rate')}
+      ${statTile(`${t.w}–${t.l}${t.d ? '–' + t.d : ''}`, t.d ? 'won–lost–tied' : 'won–lost')}
+      ${statTile(st.cur ? `🔥 ${st.cur}` : '0', 'win streak now')}
+      ${statTile(st.best, 'best win streak')}
+      ${statTile(fewest ?? '—', 'fewest guesses to crack')}
+      ${statTile(avg ?? '—', 'average guesses to crack')}
+      ${statTile(fastest ? fmtTime(fastest) : '—', 'fastest race win')}
+    </div>
+    <div class="sectionlabel">By opponent</div><div class="slist">${group(x => x.opp)}</div>
+    <div class="sectionlabel">By mode</div><div class="slist">${group(x => MODES[x.mode || 'classic'].name)}</div>
+    <div class="sectionlabel">Recent games</div><div class="slist">${recent}</div>
+    ${ui.ohistErr ? `<div class="err">${esc(ui.ohistErr)}</div>` : ''}
+  </div></div>`;
+}
+function localStats() {
+  const recs = gameLog.filter(g => g.kind === 'local');
+  const pairs = new Map();
+  recs.forEach(g => {
+    const key = g.names.slice().sort().join(' vs ');
+    if (!pairs.has(key)) pairs.set(key, { names: g.names.slice().sort(), w: {}, d: 0, n: 0 });
+    const p = pairs.get(key); p.n++;
+    if (g.winner) p.w[g.winner] = (p.w[g.winner] || 0) + 1; else p.d++;
+  });
+  const h2h = [...pairs.values()].map(p => `<div class="srow"><div><b>${esc(p.names[0])} ${p.w[p.names[0]] || 0} – ${p.w[p.names[1]] || 0} ${esc(p.names[1])}</b>
+    <small>${p.n} game${p.n === 1 ? '' : 's'}${p.d ? ` · ${p.d} tied` : ''}</small></div></div>`).join('');
+  const recent = recs.slice(0, 20).map(g => {
+    const detail = g.mode === 'trial' && g.ms ? g.ms.map((t, i) => `${esc(g.names[i])} ${isFinite(t) ? fmtTime(t) : '—'}`).join(' · ') : `${esc(g.names[0])} ${g.counts[0]} · ${esc(g.names[1])} ${g.counts[1]} guesses`;
+    return `<div class="srow"><div><b>${g.winner ? `🏆 ${esc(g.winner)} won` : '🤝 Tie'}</b><small>${MODES[g.mode || 'classic'].name} · ${detail}</small></div><small class="muted when">${whenText(g.t)}</small></div>`;
+  }).join('');
+  const legacy = Object.keys(wins).length ? `<div class="note">All-time win tally on this phone (including games from before stats were added): ${Object.entries(wins).map(([k, v]) => `<b>${esc(k)}</b> ${v}`).join(' · ')}</div>` : '';
+  if (!recs.length) return `<div class="note">No pass-the-phone games recorded yet. Finish one and it shows up here.</div>${legacy}`;
+  return `<div class="sectionlabel">Head to head</div><div class="slist">${h2h}</div>
+    <div class="sectionlabel">Recent games</div><div class="slist">${recent}</div>${legacy}`;
 }
 
 /* ---------- render ---------- */
@@ -1302,6 +1665,7 @@ function render() {
     case 'oGame': html = vOGame(); break;
     case 'oReview': html = ui.og ? vOReview() : vOGame(); break;
     case 'aNew': html = vANew(); break;
+    case 'stats': html = vStats(); break;
     case 'aGame': html = vAGame(); break;
     case 'aReview': html = ai ? reviewScreen(ai.names, ai.codes, ai.guesses, 'aback') : vANew(); break;
     default:
@@ -1368,9 +1732,16 @@ function act(a, d) {
       const n0 = (document.getElementById('n0').value || '').trim() || 'Player 1';
       let n1 = (document.getElementById('n1').value || '').trim() || 'Player 2';
       if (n1.toLowerCase() === n0.toLowerCase()) n1 += ' 2';
-      newGame(n0, n1, settings.repeats, ui.first === undefined ? 0 : ui.first); return;
+      newGame(n0, n1, settings.repeats, ui.first === undefined ? 0 : ui.first, settings.ptpMode || 'classic'); return;
     }
-    case 'uncover': game.phase = game.cover.then; if (game.phase === 'play') game.turn = game.starter;
+    case 'ptpmode': saveNames(); settings.ptpMode = d.v; saveSettings(); break;
+    case 'treveal': ui.sheet = null; revealLocal(); return;
+    case 'uncover':
+      if (game.cover.then === 'solve') {        // time trial: the clock starts now
+        game.phase = 'play'; game.turn = game.cover.p; game.t0[game.turn] = Date.now(); resetEntry(); saveGame(); render();
+        showBanner('Go!', 'var(--hit)'); sfx.turn(); return;
+      }
+      game.phase = game.cover.then; if (game.phase === 'play') game.turn = game.starter;
       resetEntry(); saveGame();
       if (game.phase === 'play') { render(); showBanner(esc(game.names[game.turn]) + "'s turn", pColor(game.turn)); return; }
       break;
@@ -1400,14 +1771,18 @@ function act(a, d) {
     case 'set': settings[d.k] = !settings[d.k]; saveSettings(); break;
     case 'resetwins': wins = {}; LS.set('cb.wins', wins); break;
 
+    case 'stats': ui.view = 'stats'; ui.sfilter = ui.sfilter || 'all'; render(); loadStats(); return;
+    case 'sfilter': ui.sfilter = d.v; break;
+
     /* vs computer */
     case 'ai': if (ai && ai.phase !== 'over') { ui.view = 'aGame'; resetEntry(); ui.otab = 'mine'; } else { ui.view = 'aNew'; ui.first = 0; } break;
     case 'alevel': settings.aiLevel = d.v; saveSettings(); break;
-    case 'astart': aiNewGame(settings.aiLevel || 'normal', settings.repeats, ui.first === undefined ? 0 : ui.first); return;
+    case 'astart': aiNewGame(settings.aiLevel || 'normal', settings.repeats, ui.first === undefined ? 0 : ui.first, settings.aiMode || 'classic'); return;
+    case 'amode': settings.aiMode = d.v; saveSettings(); break;
     case 'amenu': ui.sheet = 'amenu'; break;
     case 'aresign': ui.sheet = 'aresign'; break;
     case 'aresignyes': ai.resigned = true; aiFinish(1); saveAi(); ui.sheet = null; sfx.lose(); break;
-    case 'arematch': aiNewGame(ai.level, ai.repeats, ai.winner === null ? other(ai.starter) : ai.winner === 0 ? 1 : 0); return;
+    case 'arematch': aiNewGame(ai.level, ai.repeats, ai.winner === null ? other(ai.starter) : ai.winner === 0 ? 1 : 0, ai.mode); return;
     case 'anew': ui.view = 'aNew'; ui.first = 0; break;
     case 'areview': ui.view = 'aReview'; break;
     case 'aback': ui.view = 'aGame'; break;
@@ -1427,7 +1802,8 @@ function act(a, d) {
     }
     case 'opush': enablePush(); return;
     case 'onew': ui.view = 'oNew'; ui.oerr = ''; break;
-    case 'onewgo': ui.ocode = { mode: 'create', repeats: settings.repeats }; resetEntry(); ui.view = 'oCode'; break;
+    case 'onewgo': ui.ocode = { mode: 'create', repeats: settings.repeats, gmode: settings.onlineMode || 'classic' }; resetEntry(); ui.view = 'oCode'; break;
+    case 'omode': settings.onlineMode = d.v; saveSettings(); break;
     case 'ojoin': ui.view = 'oJoin'; ui.oerr = ''; break;
     case 'ojoingo': {
       const jc = (document.getElementById('ojoin').value || '').trim().toUpperCase();
@@ -1437,7 +1813,7 @@ function act(a, d) {
         const r = await rpc('cb_lookup', { p_secret: me.secret, p_join: jc });
         ui.joinPrefill = '';
         if (r.joined) { ui.busy = false; openGame(r.id); return; }
-        ui.ocode = { mode: 'join', join: jc, host: r.host, repeats: r.repeats }; resetEntry(); ui.view = 'oCode';
+        ui.ocode = { mode: 'join', join: jc, host: r.host, repeats: r.repeats, gmode: r.mode || 'classic' }; resetEntry(); ui.view = 'oCode';
       });
       return;
     }
@@ -1502,7 +1878,7 @@ window.cbBack = function () {
     case 'online': act('home', {}); return true;
     case 'oNew': case 'oJoin': case 'oCode': case 'oGame': act('olist', {}); return true;
     case 'oReview': act('oback', {}); return true;
-    case 'aNew': act('home', {}); return true;
+    case 'aNew': case 'stats': act('home', {}); return true;
     case 'aReview': act('aback', {}); return true;
     case 'aGame':
       if (ai && ai.phase !== 'over') { ui.sheet = 'amenu'; render(); return true; }
@@ -1521,6 +1897,9 @@ function tick() {
   else if (ui.view === 'online' || ui.view === 'home') loadList();
 }
 setInterval(tick, 3000);
+setInterval(() => {   // live races refresh every second
+  if (!document.hidden && me && ui.view === 'oGame' && !ui.busy && ui.og && ui.og.mode === 'race' && ui.og.status === 'play') loadGame();
+}, 1000);
 document.addEventListener('visibilitychange', tick);
 async function refreshPush() {
   // quietly keep this phone's alert subscription registered
