@@ -22,20 +22,29 @@ Deno.serve(async (req) => {
 
     const { data: me } = await db.from("cb_players").select("id,name").eq("secret", secret).maybeSingle();
     if (!me) return json({ error: "unknown player" }, 403);
-    const { data: g } = await db.from("cb_games").select("id,p0,p1,status,turn,winner,resigned,cracked,draw").eq("id", game).maybeSingle();
+    const { data: g } = await db.from("cb_games").select("id,p0,p1,status,turn,winner,resigned,cracked,draw,mode,n0,n1").eq("id", game).maybeSingle();
     if (!g || (g.p0 !== me.id && g.p1 !== me.id)) return json({ error: "not your game" }, 403);
     const seat = g.p0 === me.id ? 0 : 1;
     const oppId = seat === 0 ? g.p1 : g.p0;
     if (!oppId) return json({ sent: 0 });
 
+    const myN = seat === 0 ? g.n0 : g.n1;
     let body: string;
-    if (g.status === "over") {
+    if (g.status === "over" && g.mode === "race" && !g.resigned) body = g.winner === seat ? `${me.name} cracked your code first — they won the race!` : `You won the race!`;
+    else if (g.status === "over" && g.mode === "playout" && !g.resigned) {
+      body = g.draw ? `${me.name} cracked your code in ${myN} too — it's a tie!` : g.winner === seat ? `${me.name} cracked your code in ${myN} guesses — fewer than you. They win!` : `${me.name} cracked your code in ${myN} guesses — you win on fewer guesses!`;
+    }
+    else if (g.status === "over") {
       if (g.resigned) body = `${me.name} gave up — you win!`;
       else if (g.draw) body = `${me.name} cracked your code too — it's a tie!`;
       else if (g.winner === seat) body = `${me.name} cracked your code. Game over!`;
       else body = `${me.name} missed their last chance — you win!`;   // the sender just used their last-chance turn
     }
     else if (g.cracked === seat) body = `${me.name} cracked your code! Last chance — crack theirs to tie.`;
+    else if (g.mode === "playout" && kind === "guess" && myN !== null) body = `${me.name} cracked your code in ${myN} guesses! Keep going — beat or match ${myN} to win or tie.`;
+    else if (g.mode === "race" && kind === "join") body = `${me.name} joined your race! Open the game — it starts when you're both on it.`;
+    else if (g.mode === "race" && kind === "ready") body = `${me.name} is ready to race! Open the game to start.`;
+    else if (g.mode === "race" && kind === "code") body = g.status === "play" ? `${me.name} is ready for the rematch race! Open the game to start.` : `${me.name} picked their code.`;
     else if (kind === "join") body = `${me.name} joined your game. ${g.turn === seat ? "They go first." : "You go first!"}`;
     else if (kind === "rematch") body = `${me.name} wants a rematch — pick your new code.`;
     else if (kind === "code") body = g.status === "play" ? `${me.name} is ready. ${g.turn === seat ? "They go first." : "Your move!"}` : `${me.name} picked their code.`;
