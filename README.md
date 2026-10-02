@@ -20,10 +20,12 @@ iPhone: open in Safari → Share → Add to Home Screen (needed for turn alerts)
 ## Android app
 ```
 source build-env.sh
-./gradlew --offline -I local-build.gradle assembleDebug
+./gradlew -I local-build.gradle --project-cache-dir /private/tmp/codebreaker-build/project-cache assembleDebug
 adb install -r /private/tmp/codebreaker-build/app/outputs/apk/debug/app-debug.apk
 ```
-Uses the Java/Android toolchain downloaded for Daybreak (paths in `build-env.sh`).
+Toolchain lives in `~/.codebreaker-toolchain` (paths in `build-env.sh`) — deliberately outside Documents,
+because Documents syncs to iCloud and "Optimize Mac Storage" offloads files, which crashed Java mid-build.
+Build output and Gradle's project cache also go to /private/tmp for the same reason.
 Signed with the Mac's debug key (`~/.android/debug.keystore`) — keep it so updates install over the top.
 The Android app can play online but can't receive turn alerts while closed (WebView has no web push);
 installing the web app from Chrome gets alerts.
