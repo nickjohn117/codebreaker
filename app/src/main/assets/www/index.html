@@ -262,7 +262,7 @@ const LS = {
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
   del(k) { try { localStorage.removeItem(k); } catch (e) {} }
 };
-const settings = Object.assign({ repeats: true, sound: true, haptics: true, assist: false }, LS.get('cb.settings', {}));
+const settings = Object.assign({ repeats: true, sound: true, haptics: true, assist: false, aiLevel: 'normal' }, LS.get('cb.settings', {}));
 let names = LS.get('cb.names', ['Player 1', 'Player 2']);
 let wins = LS.get('cb.wins', {});          // name -> games won (pass-the-phone games)
 let game = LS.get('cb.game', null);        // the current pass-the-phone game
@@ -421,6 +421,7 @@ function onlineBoard() {
     notes: ui.onotes.notes, save: () => LS.set('cb.on.' + id, ui.onotes.notes), myCode: st.my_code, repeats: st.repeats };
 }
 function curBoard() {
+  if (ui.view === 'aGame') return ai && ai.phase === 'play' ? aiBoard() : null;
   if (ui.view === 'oGame') return ui.og && ui.og.status === 'play' ? onlineBoard() : null;
   return game ? localBoard() : null;
 }
@@ -554,6 +555,7 @@ function vHome() {
       ${cont ? `<button class="btn primary" data-act="continue">Continue game</button>` : ''}
       <button class="btn ${cont ? '' : 'primary'}" data-act="new">Pass-the-phone game</button>
       <button class="btn" data-act="online">Play online ${yt ? `<span class="homebadge">${yt} your turn</span>` : ''}</button>
+      <button class="btn" data-act="ai">${ai && ai.phase !== 'over' ? `Continue vs computer · ${LEVELS[ai.level]}` : 'Play the computer'}</button>
       <button class="btn" data-act="rules">How to play</button>
       <button class="btn" data-act="settings">Settings</button>
     </div>
@@ -656,9 +658,10 @@ function vOver() {
     </div></div>`;
 }
 function codesCards(nms, codes) {
+  const lab = n => n === 'You' ? 'Your code' : `${esc(n)}'s code`;
   return `<div class="codes">
-    <div class="card"><div class="muted" style="font-size:13px">${esc(nms[0])}'s code</div><div class="code" style="color:var(--p0)">${codes[0]}</div></div>
-    <div class="card"><div class="muted" style="font-size:13px">${esc(nms[1])}'s code</div><div class="code" style="color:var(--p1)">${codes[1]}</div></div></div>`;
+    <div class="card"><div class="muted" style="font-size:13px">${lab(nms[0])}</div><div class="code" style="color:var(--p0)">${codes[0]}</div></div>
+    <div class="card"><div class="muted" style="font-size:13px">${lab(nms[1])}</div><div class="code" style="color:var(--p1)">${codes[1]}</div></div></div>`;
 }
 function reviewScreen(nms, codes, lists, backAct) {
   const board = p => `<div style="display:flex;flex-direction:column;min-height:0">
@@ -688,8 +691,9 @@ function vRules() {
       <p>The 5 is right and in the right spot (●). The 9 is in the code but in the wrong spot (○). You see one of each — not which digit is which.</p></div>
     <div class="card"><h3>3. First to crack it wins</h3>
       <p>All your past guesses and their icons stay listed on your turn. Use them to narrow it down. The first player to guess the full code wins.</p></div>
-    <div class="card"><h3>Two ways to play</h3>
+    <div class="card"><h3>Three ways to play</h3>
       <p><b>Pass the phone:</b> both players share one phone. The game hides each code while you hand it over.</p>
+      <p><b>Vs the computer:</b> pick Easy, Normal or Hard. Easy forgets some of its clues; Normal plays like a sharp human; Hard picks the guess that rules out the most possibilities every turn.</p>
       <p><b>Online:</b> each player uses their own phone, anywhere. One player creates a game and sends the 5-letter join code; the other enters it. Take your turns whenever — turn alerts buzz you when it's your move. Secret codes are kept on the server, so nobody's phone ever sees the other's code until the game ends.</p></div>
     <div class="card"><h3>Tools</h3>
       <p><b>Digit notes:</b> tap a number once to cross it out, again to mark it as definitely in the code, again to clear. The keypad shows your marks too.</p>
@@ -731,6 +735,19 @@ function vSheet() {
       <button class="btn" data-act="settings">Settings</button>
       ${live ? `<button class="btn danger" data-act="oresign">Give up this game</button>` : ''}`);
     }
+    case 'amenu': {
+      const live = ai && ai.phase !== 'over';
+      return sheet(`
+      <button class="btn primary" data-act="closesheet">Resume</button>
+      <button class="btn" data-act="rules">How to play</button>
+      <button class="btn" data-act="settings">Settings</button>
+      <button class="btn" data-act="homekeep">Home (game is saved)</button>
+      ${live ? `<button class="btn danger" data-act="aresign">Give up this game</button>` : ''}`);
+    }
+    case 'aresign': return sheet(`
+      <h2 style="margin-bottom:4px">Give up?</h2><p class="muted" style="margin:0 0 8px">The computer wins and both codes are revealed.</p>
+      <button class="btn danger" data-act="aresignyes">Yes, give up</button>
+      <button class="btn" data-act="closesheet">Keep playing</button>`);
     case 'oresign': return sheet(`
       <h2 style="margin-bottom:4px">Give up?</h2><p class="muted" style="margin:0 0 8px">${esc(oppName())} wins and both codes are revealed.</p>
       <button class="btn danger" data-act="oresignyes">Yes, give up</button>
@@ -1036,6 +1053,182 @@ async function shareInvite() {
   render(); ui.msg = '';
 }
 
+/* ---------- computer opponent: how it picks guesses ---------- */
+const codeCache = {};
+function allCodes(repeats) {
+  const k = repeats ? 'r' : 'u';
+  if (!codeCache[k]) {
+    const out = [];
+    for (let i = 0; i < 10000; i++) { const s = String(i).padStart(4, '0'); if (repeats || !hasRepeat(s)) out.push(s); }
+    codeCache[k] = out;
+  }
+  return codeCache[k];
+}
+const pickRandom = a => a[Math.floor(Math.random() * a.length)];
+function sample(a, n) {
+  if (a.length <= n) return a;
+  const b = a.slice();   // partial shuffle: first n items end up a random sample
+  for (let i = 0; i < n; i++) { const j = i + Math.floor(Math.random() * (b.length - i)); const x = b[i]; b[i] = b[j]; b[j] = x; }
+  return b.slice(0, n);
+}
+function randomCode(repeats) { return pickRandom(allCodes(repeats)); }
+function aiPickGuess(level, clues, repeats) {
+  const all = allCodes(repeats), done = new Set(clues.map(c => c.g));
+  const fits = (code, list) => list.every(c => { const [e, n] = score(c.g, code); return e === c.e && n === c.n; });
+  // easy & normal sometimes "forget" clues; how much they remember grows as the game goes on
+  const sloppy = (wild, keep) => {
+    if (Math.random() < wild) return pickRandom(all.filter(c => !done.has(c)));
+    const remembered = clues.filter(() => Math.random() < keep);
+    const cands = all.filter(c => !done.has(c) && fits(c, remembered));
+    return cands.length ? pickRandom(cands) : pickRandom(all.filter(c => !done.has(c)));
+  };
+  const t = clues.length;
+  if (level === 'easy') return sloppy(Math.max(0.1, 0.5 - 0.03 * t), Math.min(0.85, 0.2 + 0.04 * t));
+  if (level === 'normal' && Math.random() < 0.6) return sloppy(0.05, Math.min(0.95, 0.5 + 0.05 * t));
+  const cands = all.filter(c => fits(c, clues));
+  if (!cands.length) return pickRandom(all.filter(c => !done.has(c)));   // only if a code changed mid-game
+  if (level === 'normal' || cands.length <= 2) return pickRandom(cands);
+  // hard: choose the possible code that splits the remaining possibilities most evenly
+  if (!clues.length) return pickRandom(allCodes(false));
+  // cap the work (~60k comparisons) so a move stays quick on a phone
+  const pool = sample(cands, 150), test = sample(cands, 400);
+  let best = null, bestScore = Infinity;
+  for (const g of pool) {
+    const buckets = new Array(25).fill(0);
+    for (const s of test) { const [e, n] = score(g, s); buckets[e * 5 + n]++; }
+    let sc = 0; for (const b of buckets) sc += b * b;
+    if (sc < bestScore) { bestScore = sc; best = g; }
+  }
+  return best;
+}
+
+/* ================= vs the computer ================= */
+const LEVELS = { easy: 'Easy', normal: 'Normal', hard: 'Hard' };
+let ai = LS.get('cb.ai', null);              // current game vs the computer
+let aiRecord = LS.get('cb.aiwins', {});      // level -> {w, l}
+const saveAi = () => ai ? LS.set('cb.ai', ai) : LS.del('cb.ai');
+let aiTimer = null;
+function aiBoard() {
+  return { p: 0, names: ai.names, mine: ai.guesses[0], theirs: ai.guesses[1], notes: ai.notes,
+    save: saveAi, myCode: ai.codes[0], repeats: ai.repeats };
+}
+function aiNewGame(level, repeats, first) {
+  settings.repeats = repeats; settings.aiLevel = level; saveSettings();
+  const starter = first === 2 ? (Math.random() < 0.5 ? 0 : 1) : first;
+  ai = { v: 1, level, repeats, starter, turn: starter, phase: 'code', names: [aiMyName(), 'Computer'],
+    codes: ['', randomCode(repeats)], guesses: [[], []], notes: mkNotes(), winner: null, resigned: false };
+  saveAi(); resetEntry(); ui.otab = 'mine'; ui.view = 'aGame'; render();
+}
+const aiMyName = () => (me && me.name) || (names[0] && names[0] !== 'Player 1' ? names[0] : 'You');
+function aiRecordFor(level) { return aiRecord[level] || { w: 0, l: 0 }; }
+function aiFinish(winner) {
+  ai.phase = 'over'; ai.winner = winner;
+  const r = aiRecordFor(ai.level); if (winner === 0) r.w++; else r.l++; aiRecord[ai.level] = r; LS.set('cb.aiwins', aiRecord);
+}
+function aiLock() {
+  const c = entryStr(); if (!c) return;
+  if (!ai.repeats && hasRepeat(c)) { flash('No repeated digits in this game.'); return; }
+  ai.codes[0] = c; ai.phase = 'play'; sfx.lock(); saveAi(); resetEntry(); render();
+  showBanner(ai.turn === 0 ? 'You go first!' : 'Computer goes first', ai.turn === 0 ? 'var(--hit)' : 'var(--p1)');
+}
+function aiGuess() {
+  const g = entryStr(); if (!g) return;
+  if (ai.guesses[0].some(x => x.g === g)) { flash('You already guessed ' + g + '.'); return; }
+  const [e, n] = score(g, ai.codes[1]);
+  ai.guesses[0].push({ g, e, n }); ui.fresh = true; resetEntry(); ui.otab = 'mine';
+  if (e === 4) { aiFinish(0); sfx.result(4, 0); setTimeout(sfx.win, 450); setTimeout(confetti, 300); }
+  else { ai.turn = 1; sfx.result(e, n); }
+  saveAi(); render();
+}
+function aiScheduleMove() {
+  // the computer "thinks" for a moment so its turn is easy to follow
+  if (aiTimer || !ai || ai.phase !== 'play' || ai.turn !== 1) return;
+  aiTimer = setTimeout(() => {
+    aiTimer = null;
+    if (!ai || ai.phase !== 'play' || ai.turn !== 1) return;
+    const g = aiPickGuess(ai.level, ai.guesses[1], ai.repeats);
+    const [e, n] = score(g, ai.codes[0]);
+    ai.guesses[1].push({ g, e, n });
+    if (e === 4) { aiFinish(1); saveAi(); if (ui.view === 'aGame') { render(); sfx.lose(); } return; }
+    ai.turn = 0; saveAi();
+    if (ui.view === 'aGame') { render(); sfx.turn(); showBanner(`Computer guessed ${g}`, 'var(--p1)'); }
+  }, 1300 + Math.random() * 900);
+}
+function vANew() {
+  const lv = settings.aiLevel || 'normal', first = ui.first === undefined ? 0 : ui.first;
+  const desc = { easy: 'Forgets some of its clues and guesses wildly at times. Usually needs about 10 guesses.',
+    normal: 'Always plays a guess that fits most of what it knows. Usually cracks a code in about 7.',
+    hard: 'Picks the guess that rules out the most possibilities every turn. Usually 5 or 6.' };
+  const rec = aiRecordFor(lv);
+  return `<div class="screen scroll"><div class="content">
+    <div class="pagehead"><button class="iconbtn" data-act="home">‹</button><h2>Play the computer</h2></div>
+    <div class="field"><label>Difficulty</label>
+      <div class="seg" style="margin:0">${Object.keys(LEVELS).map(k => `<button data-act="alevel" data-v="${k}" class="${lv === k ? 'on' : ''}">${LEVELS[k]}</button>`).join('')}</div>
+      <small class="muted" style="line-height:1.45;font-size:13px">${desc[lv]}${rec.w + rec.l ? ` Your record on ${LEVELS[lv]}: <b style="color:var(--text)">${rec.w} won, ${rec.l} lost</b>.` : ''}</small></div>
+    ${repeatsOpt('toggleNewRep')}
+    <div class="field"><label>Who guesses first?</label>
+      <div class="seg" style="margin:0">
+        <button data-act="first" data-v="0" class="${first === 0 ? 'on' : ''}">Me</button>
+        <button data-act="first" data-v="1" class="${first === 1 ? 'on' : ''}">Computer</button>
+        <button data-act="first" data-v="2" class="${first === 2 ? 'on' : ''}">Random</button>
+      </div></div>
+    <button class="btn primary" data-act="astart" style="margin-top:8px">Start — pick my secret code</button>
+  </div></div>`;
+}
+function vAGame() {
+  if (!ai) { ui.view = 'aNew'; return vANew(); }
+  if (ai.phase === 'code') return codeEntry({ left: `<button class="iconbtn" data-act="amenu">≡</button>`, title: 'Set your secret code',
+    note: `The computer (${LEVELS[ai.level]}) will try to crack it. It can't see your code — honest!`, repeats: ai.repeats });
+  if (ai.phase === 'over') return vAOver();
+  const b = aiBoard(), myTurn = ai.turn === 0, tab = ui.otab;
+  const fresh = ui.fresh; ui.fresh = false;
+  ui.peekCode = b.myCode;
+  const tabs = `<div class="minitabs">
+    <button data-act="otab" data-v="mine" class="${tab !== 'theirs' && tab !== 'notes' ? 'on' : ''}">Mine (${b.mine.length})</button>
+    <button data-act="otab" data-v="theirs" class="${tab === 'theirs' ? 'on' : ''}">Computer (${b.theirs.length})</button>
+    <button data-act="otab" data-v="notes" class="narrowonly ${tab === 'notes' ? 'on' : ''}">📝 Notes</button></div>`;
+  const theirs = tab === 'theirs';
+  const hist = theirs
+    ? historyHtml(b.theirs, false, `This is how close the computer is to your code <b class="mono">${esc(b.myCode)}</b>.`, tabs)
+    : historyHtml(b.mine, fresh, myTurn ? 'Enter 4 digits and tap Guess.' : '', tabs, { notes: b.notes, pane: tab === 'notes' ? notesPane(b) : '' });
+  let controls;
+  if (myTurn) controls = guessControls(b);
+  else {
+    const last = b.mine[b.mine.length - 1], t = toolsHtml(b.notes), noting = tab === 'notes';
+    controls = `${noting ? `<button class="btn narrowonly backbar" data-act="otab" data-v="mine">Back to my guesses</button>` : ''}<div class="result ${noting ? 'wideonly' : ''}">
+        ${last ? `<div class="muted" style="font-size:14px">Your guess <b class="mono" style="color:var(--text)">${last.g}</b></div>
+          <div class="big" style="margin-bottom:4px"><div><strong style="color:var(--hit)">${last.e}</strong>right spot</div><div><strong style="color:var(--near)">${last.n}</strong>wrong spot</div></div>` : ''}
+        <div class="waiting"><span class="spin"></span>The computer is thinking…</div></div>
+      <div class="wideonly">${notesHead}<div class="notes">${t.chips}</div><div class="toolhead"><span>Spot grid</span></div>${t.grid}</div>`;
+  }
+  const lastTheirs = b.theirs[b.theirs.length - 1];
+  return `<div class="screen">
+    <div class="topbar"><button class="iconbtn" data-act="amenu">≡</button>
+      <div class="t"><h2>${myTurn ? '<span style="color:var(--hit)">Your turn</span>' : "Computer's turn"}</h2><div>vs Computer · ${LEVELS[ai.level]} · ${myTurn ? `guess #${b.mine.length + 1}` : `${plural(b.mine.length, 'guess')} so far`}</div></div>
+      <button class="peek" id="peek">My code</button></div>
+    <button class="opp tap" data-act="otab" data-v="theirs" style="width:100%;text-align:left"><span><b style="color:var(--p1)">Computer</b> ${lastTheirs ? `last guessed <b class="mono">${lastTheirs.g}</b> on your code` : "hasn't guessed yet"}</span>${lastTheirs ? pegs(lastTheirs.e, lastTheirs.n) : ''}</button>
+    <div class="play">
+      <div class="left">${hist}${theirs ? '' : assistHtml(b)}</div>
+      <div class="controls">${controls}</div>
+    </div></div>`;
+}
+function vAOver() {
+  const won = ai.winner === 0, mine = ai.guesses[0].length, theirs = ai.guesses[1].length, rec = aiRecordFor(ai.level);
+  const line = ai.resigned ? 'You gave up.' : won ? `You cracked its code in ${plural(mine, 'guess')}. The computer made ${theirs}.` : `The computer cracked your code in ${plural(theirs, 'guess')}. You made ${mine}.`;
+  return `<div class="screen center scroll">
+    <div class="trophy">${won ? '🏆' : '🤖'}</div>
+    <h1 style="font-size:clamp(26px,7vw,40px)">${won ? '<span style="color:var(--hit)">You win!</span>' : 'The computer wins'}</h1>
+    <p class="muted" style="margin:8px 0 0">${line}</p>
+    ${codesCards(ai.names, ai.codes)}
+    <div class="score">${LEVELS[ai.level]} record: <b>${rec.w}</b>won · <b>${rec.l}</b>lost</div>
+    <div class="stack">
+      <button class="btn primary" data-act="arematch">Play again (${LEVELS[ai.level]})</button>
+      <button class="btn" data-act="anew">Change difficulty</button>
+      <button class="btn" data-act="areview">Review both boards</button>
+      <button class="btn" data-act="home">Home</button>
+    </div></div>`;
+}
+
 /* ---------- render ---------- */
 function render() {
   ui.typing = false; ui.codeMode = false; ui.peekCode = '';
@@ -1053,6 +1246,9 @@ function render() {
     case 'oCode': html = vOCode(); break;
     case 'oGame': html = vOGame(); break;
     case 'oReview': html = ui.og ? vOReview() : vOGame(); break;
+    case 'aNew': html = vANew(); break;
+    case 'aGame': html = vAGame(); break;
+    case 'aReview': html = ai ? reviewScreen(ai.names, ai.codes, ai.guesses, 'aback') : vANew(); break;
     default:
       if (!game) { ui.view = 'home'; html = vHome(); break; }
       if (game.phase === 'cover') html = vCover();
@@ -1068,6 +1264,7 @@ function render() {
   if (keep) { const n = document.getElementById(keep.id); if (n) { n.value = keep.v; n.focus(); try { n.setSelectionRange(keep.s, keep.s); } catch (e) {} } }
   const h = document.getElementById('hist'); if (h) h.scrollTop = h.scrollHeight;
   bindPeek();
+  if (ui.view === 'aGame') aiScheduleMove();
 }
 function showBanner(text, color) {
   const b = document.createElement('div'); b.className = 'banner';
@@ -1129,6 +1326,7 @@ function act(a, d) {
       if (ui.view === 'game') { game.phase === 'code' ? lockCode() : submitGuess(); }
       else if (ui.view === 'oCode' || (ui.view === 'oGame' && ui.og && ui.og.status === 'codes')) oLock();
       else if (ui.view === 'oGame') oGuess();
+      else if (ui.view === 'aGame') { ai.phase === 'code' ? aiLock() : aiGuess(); }
       return;
     case 'reveal': ui.reveal = !ui.reveal; break;
     case 'pass': passTurn(); return;
@@ -1146,6 +1344,18 @@ function act(a, d) {
     case 'backover': ui.view = 'game'; break;
     case 'set': settings[d.k] = !settings[d.k]; saveSettings(); break;
     case 'resetwins': wins = {}; LS.set('cb.wins', wins); break;
+
+    /* vs computer */
+    case 'ai': if (ai && ai.phase !== 'over') { ui.view = 'aGame'; resetEntry(); ui.otab = 'mine'; } else { ui.view = 'aNew'; ui.first = 0; } break;
+    case 'alevel': settings.aiLevel = d.v; saveSettings(); break;
+    case 'astart': aiNewGame(settings.aiLevel || 'normal', settings.repeats, ui.first === undefined ? 0 : ui.first); return;
+    case 'amenu': ui.sheet = 'amenu'; break;
+    case 'aresign': ui.sheet = 'aresign'; break;
+    case 'aresignyes': ai.resigned = true; aiFinish(1); saveAi(); ui.sheet = null; sfx.lose(); break;
+    case 'arematch': aiNewGame(ai.level, ai.repeats, ai.winner === 0 ? 1 : 0); return;
+    case 'anew': ui.view = 'aNew'; ui.first = 0; break;
+    case 'areview': ui.view = 'aReview'; break;
+    case 'aback': ui.view = 'aGame'; break;
 
     /* online */
     case 'online': goOnline(); return;
@@ -1237,6 +1447,11 @@ window.cbBack = function () {
     case 'online': act('home', {}); return true;
     case 'oNew': case 'oJoin': case 'oCode': case 'oGame': act('olist', {}); return true;
     case 'oReview': act('oback', {}); return true;
+    case 'aNew': act('home', {}); return true;
+    case 'aReview': act('aback', {}); return true;
+    case 'aGame':
+      if (ai && ai.phase !== 'over') { ui.sheet = 'amenu'; render(); return true; }
+      act('home', {}); return true;
     case 'game':
       if (game && (game.phase === 'play' || game.phase === 'code')) { ui.sheet = 'menu'; render(); return true; }
       act('home', {}); return true;
